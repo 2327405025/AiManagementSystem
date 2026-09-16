@@ -81,6 +81,11 @@ class TaskApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fields.title").exists());
 
+        mvc.perform(post("/api/tasks").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Task\",\"priority\":\"critical\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Malformed or unsupported field value"));
+
         mvc.perform(get("/api/tasks").param("size", "101"))
                 .andExpect(status().isBadRequest());
     }

@@ -4,6 +4,7 @@ import com.example.taskmanager.domain.Priority;
 import com.example.taskmanager.domain.TaskStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.Page;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,4 +41,17 @@ public final class TaskDtos {
             TaskStatus status,
             List<DependencyNode> dependencies
     ) {}
+
+    public record TaskPage(
+            List<TaskResponse> content,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages
+    ) {
+        public static TaskPage from(Page<TaskResponse> result) {
+            return new TaskPage(result.getContent(), result.getNumber(), result.getSize(),
+                    result.getTotalElements(), result.getTotalPages());
+        }
+    }
 }

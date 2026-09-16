@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -31,6 +33,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<Problem> handleBadInput(IllegalArgumentException exception, HttpServletRequest request) {
         return ResponseEntity.badRequest()
                 .body(problem(400, exception.getMessage(), request.getRequestURI(), null));
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    ResponseEntity<Problem> handleMalformedInput(Exception exception, HttpServletRequest request) {
+        return ResponseEntity.badRequest()
+                .body(problem(400, "Malformed or unsupported field value", request.getRequestURI(), null));
     }
 
     private Problem problem(int status, String message, String path, Map<String, String> fields) {

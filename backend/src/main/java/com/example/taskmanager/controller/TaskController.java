@@ -3,11 +3,11 @@ package com.example.taskmanager.controller;
 import com.example.taskmanager.domain.Priority;
 import com.example.taskmanager.domain.TaskStatus;
 import com.example.taskmanager.dto.TaskDtos.DependencyNode;
+import com.example.taskmanager.dto.TaskDtos.TaskPage;
 import com.example.taskmanager.dto.TaskDtos.TaskRequest;
 import com.example.taskmanager.dto.TaskDtos.TaskResponse;
 import com.example.taskmanager.service.TaskService;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -48,7 +48,7 @@ public class TaskController {
     }
 
     @GetMapping
-    Page<TaskResponse> list(
+    TaskPage list(
             @RequestParam(required = false) TaskStatus status,
             @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) String tag,
@@ -65,8 +65,8 @@ public class TaskController {
         }
         Sort.Direction sortDirection = Sort.Direction.fromOptionalString(direction)
                 .orElseThrow(() -> new IllegalArgumentException("direction must be asc or desc"));
-        return service.list(status, priority, tag, query,
-                PageRequest.of(page, size, Sort.by(sortDirection, sort)));
+        return TaskPage.from(service.list(status, priority, tag, query,
+                PageRequest.of(page, size, Sort.by(sortDirection, sort))));
     }
 
     @PutMapping("/{id}")
