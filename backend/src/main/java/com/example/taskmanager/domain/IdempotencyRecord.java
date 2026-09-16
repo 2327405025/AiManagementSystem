@@ -10,6 +10,7 @@ import java.time.Instant;
 /**
  * Durable mapping from a client retry key to its created task.
  * The primary-key constraint is the final guard against concurrent duplicates.
+ * 将客户端重试 Key 持久映射到已创建任务；主键约束是防止并发重复创建的最后防线。
  */
 @Entity
 @Table(name = "idempotency_records")

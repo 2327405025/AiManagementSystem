@@ -33,7 +33,8 @@ function App() {
   const [aiText, setAiText] = useState('')
   const [decompositions, setDecompositions] = useState<Record<number, Decomposition>>({})
 
-  // Filters are part of the key so each server-side result has an independent cache entry.
+  // Filters are part of the key so each server result has an independent cache entry.
+  // 筛选条件进入查询键，使每组服务端结果拥有独立缓存。
   const queryKey = ['tasks', filters]
   const tasks = useQuery({
     queryKey,
@@ -73,6 +74,7 @@ function App() {
     onMutate: async ({ task, status }) => {
       // Status changes feel immediate; the snapshot restores every affected
       // query if the dependency guard or network request rejects the update.
+      // 状态变更会即时呈现；依赖校验或网络请求失败时，用快照恢复所有受影响查询。
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       const previous = queryClient.getQueriesData<Page<Task>>({ queryKey: ['tasks'] })
       queryClient.setQueriesData<Page<Task>>({ queryKey: ['tasks'] }, (page) => page && ({

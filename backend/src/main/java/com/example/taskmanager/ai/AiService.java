@@ -31,9 +31,11 @@ import java.util.regex.Pattern;
 
 /**
  * Provider-neutral AI service using the OpenAI-compatible chat protocol.
+ * 使用 OpenAI 兼容对话协议、与供应商无关的 AI 服务。
  *
  * <p>DeepSeek works by changing only the base URL and model. External failures
  * are circuit-broken and converted to deterministic local suggestions.</p>
+ * <p>接入 DeepSeek 只需修改基础 URL 和模型；外部故障经熔断后转为确定性的本地建议。</p>
  */
 @Service
 public class AiService {
@@ -76,7 +78,8 @@ public class AiService {
                     }
                 });
             } catch (RuntimeException ignored) {
-                // Availability is more important than coupling task creation to an external provider.
+                // Availability takes priority over coupling task creation to an external provider.
+                // 服务可用性优先，任务创建不应强依赖外部 AI 供应商。
             }
         }
         return ruleParse(text);
@@ -101,6 +104,7 @@ public class AiService {
                 });
             } catch (RuntimeException ignored) {
                 // Fall through to deterministic suggestions.
+                // 失败后继续执行确定性的本地建议。
             }
         }
         return ruleDecompose(request);

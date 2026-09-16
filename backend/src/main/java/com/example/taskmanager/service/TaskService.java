@@ -39,10 +39,12 @@ import java.util.Set;
 
 /**
  * Application service for task invariants.
+ * 维护任务业务不变量的应用服务。
  *
  * <p>PostgreSQL is authoritative. Cache eviction and vector-index events are
- * deliberately deferred until commit so rolled-back writes never leak into
- * derived stores.</p>
+ * deferred until commit so rolled-back writes never leak into derived stores.</p>
+ * <p>PostgreSQL 是唯一事实源。缓存失效和向量索引事件均延迟到事务提交后执行，
+ * 避免已回滚的数据泄漏到派生存储中。</p>
  */
 @Service
 @Transactional(readOnly = true)
@@ -68,8 +70,8 @@ public class TaskService {
         String key = normalizeIdempotencyKey(idempotencyKey);
         String requestHash = key == null ? null : hash(request);
         if (key != null) {
-            // A replay returns the original resource; reusing a key for a
-            // different payload is a client error.
+            // A replay returns the original resource; a different payload conflicts.
+            // 重放相同请求时返回原资源；同一 Key 搭配不同请求体属于客户端冲突。
             var existing = idempotencyRecords.findById(key);
             if (existing.isPresent()) {
                 if (!existing.get().getRequestHash().equals(requestHash)) {

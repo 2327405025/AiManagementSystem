@@ -24,7 +24,8 @@ export interface TaskFilters {
 
 export async function listTasks(filters: TaskFilters) {
   if (filters.smart && filters.query) {
-    // Adapt semantic results to the same page shape consumed by the dashboard.
+    // Adapt semantic results to the page shape consumed by the dashboard.
+    // 将语义搜索结果转换为工作台使用的统一分页结构。
     const params = new URLSearchParams({ query: filters.query, limit: '20' })
     const result = await request<{ content: Task[]; source: 'vector' | 'keyword_fallback' }>(
       `/api/tasks/semantic-search?${params}`,

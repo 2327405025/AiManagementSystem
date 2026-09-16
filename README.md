@@ -2,6 +2,10 @@
 
 [English documentation](README.en.md)
 
+配套文档：
+- [技术文档（中文）](docs/TECHNICAL.zh-CN.md) / [Technical Guide (English)](docs/TECHNICAL.en.md)
+- [架构文档（中文）](docs/ARCHITECTURE.zh-CN.md) / [Architecture Guide (English)](docs/ARCHITECTURE.en.md)
+
 ## 岗位方向
 全栈 + AI/LLM
 

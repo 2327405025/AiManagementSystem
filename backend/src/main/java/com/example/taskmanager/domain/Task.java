@@ -53,6 +53,7 @@ public class Task {
     private Instant updatedAt;
 
     // Prevents two editors from silently overwriting each other's updates.
+    // 防止两个编辑者的并发更新被静默覆盖。
     @Version
     @Column(nullable = false)
     private long version;

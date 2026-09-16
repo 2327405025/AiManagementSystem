@@ -2,6 +2,10 @@
 
 [中文文档](README.md)
 
+Companion documents:
+- [技术文档（中文）](docs/TECHNICAL.zh-CN.md) / [Technical Guide (English)](docs/TECHNICAL.en.md)
+- [架构文档（中文）](docs/ARCHITECTURE.zh-CN.md) / [Architecture Guide (English)](docs/ARCHITECTURE.en.md)
+
 ## Track
 Full Stack + AI/LLM
 

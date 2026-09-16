@@ -13,10 +13,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Isolates latency-prone AI calls from best-effort vector indexing.
+ * 将高延迟 AI 调用与尽力而为的向量索引任务隔离。
  *
  * <p>The AI pool rejects excess work so overload is visible as HTTP 429. The
  * indexing pool applies caller-runs backpressure because dropping committed
  * task changes would increase reconciliation lag.</p>
+ * <p>AI 线程池拒绝超额任务并返回 HTTP 429；索引线程池采用调用方执行策略施加背压，
+ * 因为丢弃已提交任务的索引事件会扩大校准延迟。</p>
  */
 @Configuration
 @EnableAsync

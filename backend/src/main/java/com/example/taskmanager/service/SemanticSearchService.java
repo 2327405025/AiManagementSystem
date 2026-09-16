@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 /**
  * Keeps vector search optional: Chroma failures degrade to indexed database
  * filtering instead of becoming user-visible availability failures.
+ * 保持向量搜索为可选能力：Chroma 故障时降级到数据库过滤，不影响用户可用性。
  */
 @Service
 public class SemanticSearchService {

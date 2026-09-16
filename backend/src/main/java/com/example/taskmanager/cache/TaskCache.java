@@ -17,10 +17,13 @@ import java.util.function.Supplier;
 
 /**
  * Two-level cache for immutable task DTOs.
+ * 面向不可变任务 DTO 的两级缓存。
  *
  * <p>Caffeine provides per-process request coalescing and Redis provides a
  * shared L2. Every Redis operation is fail-open because cache availability
  * must never determine task availability.</p>
+ * <p>Caffeine 在进程内合并同 Key 请求，Redis 提供共享 L2。Redis 操作全部故障放行，
+ * 因为缓存可用性不应决定任务服务的可用性。</p>
  */
 @Component
 public class TaskCache {
@@ -53,6 +56,7 @@ public class TaskCache {
     public TaskResponse getOrLoad(Long id, Supplier<TaskResponse> loader) {
         // Caffeine invokes the mapping function once per key, preventing a
         // burst of identical misses from stampeding PostgreSQL.
+        // Caffeine 对每个 Key 只执行一次加载，避免并发缓存未命中击穿 PostgreSQL。
         return local.get(id, key -> loadFromRedis(key).orElseGet(() -> {
             TaskResponse loaded = loader.get();
             writeToRedis(loaded);
@@ -71,7 +75,8 @@ public class TaskCache {
             }
             return Optional.of(mapper.readValue(value, TaskResponse.class));
         } catch (Exception ignored) {
-            // Cache is an optimization: Redis failure must not fail the request.
+            // Cache is an optimization; Redis failures must not fail requests.
+            // 缓存只是优化手段，Redis 故障不能导致业务请求失败。
             return Optional.empty();
         }
     }
@@ -82,10 +87,12 @@ public class TaskCache {
         }
         try {
             // Jitter prevents a large batch of entries from expiring together.
+            // 随机抖动避免大量缓存条目在同一时刻过期。
             Duration jitteredTtl = redisTtl.plusSeconds(ThreadLocalRandom.current().nextLong(61));
             redis.opsForValue().set(key(task.id()), mapper.writeValueAsString(task), jitteredTtl);
         } catch (Exception ignored) {
             // PostgreSQL remains the source of truth.
+            // PostgreSQL 始终是唯一事实源。
         }
     }
 
@@ -98,6 +105,7 @@ public class TaskCache {
             redis.delete(key(id));
         } catch (Exception ignored) {
             // Short TTL bounds stale data if Redis is temporarily unavailable.
+            // Redis 暂时不可用时，短 TTL 可限制本地脏数据的存续时间。
         }
     }
 

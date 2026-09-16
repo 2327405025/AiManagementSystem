@@ -14,6 +14,7 @@ import java.util.Map;
 /**
  * Repairs the small crash window between a database commit and asynchronous
  * vector indexing. The bounded recent batch keeps reconciliation inexpensive.
+ * 修复数据库提交与异步向量索引之间的短暂崩溃窗口；有限的近期批次控制校准成本。
  */
 @Component
 public class TaskIndexReconciler {

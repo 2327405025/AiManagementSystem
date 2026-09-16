@@ -20,9 +20,11 @@ import java.util.Map;
 
 /**
  * HTTP adapter for the rebuildable Chroma task index.
+ * 可重建 Chroma 任务索引的 HTTP 适配器。
  *
  * <p>Indexing is asynchronous and intentionally cannot roll back a committed
  * task. Search callers own the keyword fallback when this adapter fails.</p>
+ * <p>索引异步执行，不会回滚已提交的任务；该适配器失败时，由搜索调用方负责关键词降级。</p>
  */
 @Component
 public class ChromaTaskIndex {
@@ -62,7 +64,8 @@ public class ChromaTaskIndex {
                 }
             });
         } catch (RuntimeException ignored) {
-            // PostgreSQL commit is authoritative; the reconciler repairs missed indexing.
+            // PostgreSQL commits are authoritative; reconciliation repairs missed indexing.
+            // PostgreSQL 提交结果具有权威性；校准任务负责修复遗漏的索引。
         }
     }
 
@@ -99,6 +102,7 @@ public class ChromaTaskIndex {
         synchronized (this) {
             // Collection creation is lazy so local H2 development does not
             // require Chroma unless vector search is explicitly enabled.
+            // 集合采用延迟创建，本地 H2 开发仅在显式启用向量搜索时才依赖 Chroma。
             if (collectionId == null) {
                 JsonNode collection = post("/collections", Map.of(
                         "name", collectionName,

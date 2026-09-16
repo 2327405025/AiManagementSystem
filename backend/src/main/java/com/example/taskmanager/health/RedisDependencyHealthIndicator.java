@@ -8,9 +8,12 @@ import org.springframework.stereotype.Component;
 
 /**
  * Reports optional Redis failures without taking the service out of rotation.
+ * 报告可选 Redis 依赖故障，但不将服务移出流量池。
  *
  * <p>The readiness group maps {@code DEGRADED} to HTTP 200 because task reads
  * safely fall back to PostgreSQL. Database failures still report DOWN.</p>
+ * <p>任务读取可安全回源 PostgreSQL，因此就绪组将 {@code DEGRADED} 映射为 HTTP 200；
+ * 数据库故障仍报告 DOWN。</p>
  */
 @Component("redisDependency")
 public class RedisDependencyHealthIndicator implements HealthIndicator {
