@@ -19,9 +19,24 @@ export interface TaskFilters {
   priority?: Priority
   query?: string
   page: number
+  smart?: boolean
 }
 
-export function listTasks(filters: TaskFilters) {
+export async function listTasks(filters: TaskFilters) {
+  if (filters.smart && filters.query) {
+    const params = new URLSearchParams({ query: filters.query, limit: '20' })
+    const result = await request<{ content: Task[]; source: 'vector' | 'keyword_fallback' }>(
+      `/api/tasks/semantic-search?${params}`,
+    )
+    return {
+      content: result.content,
+      totalElements: result.content.length,
+      totalPages: 1,
+      page: 0,
+      size: result.content.length,
+      source: result.source,
+    } satisfies Page<Task>
+  }
   const params = new URLSearchParams({ page: String(filters.page), size: '9' })
   if (filters.status) params.set('status', filters.status)
   if (filters.priority) params.set('priority', filters.priority)

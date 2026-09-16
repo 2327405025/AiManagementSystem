@@ -12,6 +12,7 @@ export interface Task {
   updatedAt: string
   tags: string[]
   dependencyIds: number[]
+  version: number
 }
 
 export interface TaskInput {
@@ -21,6 +22,7 @@ export interface TaskInput {
   priority?: Priority
   dueAt?: string | null
   tags?: string[]
+  version?: number
 }
 
 export interface Page<T> {
@@ -29,6 +31,7 @@ export interface Page<T> {
   totalPages: number
   page: number
   size: number
+  source?: 'vector' | 'keyword_fallback'
 }
 
 export interface TaskSuggestion extends TaskInput {

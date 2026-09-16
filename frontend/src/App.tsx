@@ -26,7 +26,7 @@ const priorityLabel: Record<Priority, string> = {
 
 function App() {
   const queryClient = useQueryClient()
-  const [filters, setFilters] = useState({ query: '', status: '', priority: '', page: 0 })
+  const [filters, setFilters] = useState({ query: '', status: '', priority: '', page: 0, smart: false })
   const [draft, setDraft] = useState<TaskInput>(emptyDraft)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [tags, setTags] = useState('')
@@ -41,6 +41,7 @@ function App() {
       query: filters.query || undefined,
       status: (filters.status || undefined) as TaskStatus | undefined,
       priority: (filters.priority || undefined) as Priority | undefined,
+      smart: filters.smart,
     }),
   })
 
@@ -66,6 +67,7 @@ function App() {
         priority: task.priority,
         dueAt: task.dueAt,
         tags: task.tags,
+        version: task.version,
       }),
     onMutate: async ({ task, status }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
@@ -124,6 +126,7 @@ function App() {
       priority: task.priority,
       dueAt: task.dueAt,
       tags: task.tags,
+      version: task.version,
     })
     setTags(task.tags.join(', '))
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -236,8 +239,20 @@ function App() {
             <option value="">全部优先级</option>
             {Object.entries(priorityLabel).map(([value, label]) => <option key={value} value={value}>{label}优先级</option>)}
           </select>
+          <button
+            className={filters.smart ? 'smart-toggle active' : 'smart-toggle'}
+            onClick={() => setFilters({ ...filters, smart: !filters.smart, page: 0 })}
+            title="使用 ChromaDB 语义向量检索；不可用时自动降级"
+          >
+            ✦ 智能搜索
+          </button>
         </div>
 
+        {filters.smart && filters.query && tasks.data?.source && (
+          <div className="search-source">
+            {tasks.data.source === 'vector' ? 'ChromaDB 语义结果' : '向量服务不可用，已降级为关键词搜索'}
+          </div>
+        )}
         {(tasks.error || operationError) && (
           <div className="notice error">{(tasks.error || operationError)?.message}</div>
         )}
@@ -281,7 +296,7 @@ function App() {
           ))}
         </div>
 
-        {(tasks.data?.totalPages ?? 0) > 1 && (
+        {!filters.smart && (tasks.data?.totalPages ?? 0) > 1 && (
           <nav className="pagination" aria-label="分页">
             <button disabled={filters.page === 0} onClick={() => setFilters({ ...filters, page: filters.page - 1 })}>上一页</button>
             <span>{filters.page + 1} / {tasks.data?.totalPages}</span>
