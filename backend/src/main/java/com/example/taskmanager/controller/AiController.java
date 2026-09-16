@@ -1,6 +1,6 @@
 package com.example.taskmanager.controller;
 
-import com.example.taskmanager.ai.AiService;
+import com.example.taskmanager.ai.AsyncAiFacade;
 import com.example.taskmanager.dto.AiDtos.DecomposeRequest;
 import com.example.taskmanager.dto.AiDtos.Decomposition;
 import com.example.taskmanager.dto.AiDtos.NaturalLanguageRequest;
@@ -11,22 +11,24 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.concurrent.CompletableFuture;
+
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {
-    private final AiService service;
+    private final AsyncAiFacade service;
 
-    public AiController(AiService service) {
+    public AiController(AsyncAiFacade service) {
         this.service = service;
     }
 
     @PostMapping("/parse-task")
-    TaskSuggestion parseTask(@Valid @RequestBody NaturalLanguageRequest request) {
+    CompletableFuture<TaskSuggestion> parseTask(@Valid @RequestBody NaturalLanguageRequest request) {
         return service.parse(request.text());
     }
 
     @PostMapping("/decompose")
-    Decomposition decompose(@Valid @RequestBody DecomposeRequest request) {
+    CompletableFuture<Decomposition> decompose(@Valid @RequestBody DecomposeRequest request) {
         return service.decompose(request);
     }
 }

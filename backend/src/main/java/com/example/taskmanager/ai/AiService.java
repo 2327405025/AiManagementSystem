@@ -7,6 +7,8 @@ import com.example.taskmanager.dto.AiDtos.SubtaskSuggestion;
 import com.example.taskmanager.dto.AiDtos.TaskSuggestion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -35,8 +37,9 @@ public class AiService {
     private final String apiKey;
     private final String baseUrl;
     private final String model;
+    private final CircuitBreaker circuitBreaker;
 
-    public AiService(ObjectMapper mapper,
+    public AiService(ObjectMapper mapper, CircuitBreakerRegistry circuitBreakerRegistry,
                      @Value("${app.ai.api-key:}") String apiKey,
                      @Value("${app.ai.base-url}") String baseUrl,
                      @Value("${app.ai.model}") String model) {
@@ -44,22 +47,29 @@ public class AiService {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl.replaceAll("/$", "");
         this.model = model;
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("aiProvider");
     }
 
     public TaskSuggestion parse(String text) {
         if (!apiKey.isBlank()) {
             try {
-                String prompt = """
-                        Extract a task from the user text. Return JSON only with fields:
-                        title, description, dueAt (ISO-8601 instant or null),
-                        priority (low|medium|high), tags (string array).
-                        Current instant: %s
-                        User text: %s
-                        """.formatted(Instant.now(), text);
-                TaskSuggestion result = mapper.readValue(call(prompt), TaskSuggestion.class);
-                return new TaskSuggestion(result.title(), result.description(), result.dueAt(),
-                        result.priority(), result.tags(), "llm");
-            } catch (Exception ignored) {
+                return circuitBreaker.executeSupplier(() -> {
+                    String prompt = """
+                            Extract a task from the user text. Return JSON only with fields:
+                            title, description, dueAt (ISO-8601 instant or null),
+                            priority (low|medium|high), tags (string array).
+                            Current instant: %s
+                            User text: %s
+                            """.formatted(Instant.now(), text);
+                    try {
+                        TaskSuggestion result = mapper.readValue(call(prompt), TaskSuggestion.class);
+                        return new TaskSuggestion(result.title(), result.description(), result.dueAt(),
+                                result.priority(), result.tags(), "llm");
+                    } catch (Exception exception) {
+                        throw new IllegalStateException("AI provider request failed", exception);
+                    }
+                });
+            } catch (RuntimeException ignored) {
                 // Availability is more important than coupling task creation to an external provider.
             }
         }
@@ -69,15 +79,21 @@ public class AiService {
     public Decomposition decompose(DecomposeRequest request) {
         if (!apiKey.isBlank()) {
             try {
-                String prompt = """
-                        Break this task into 3-6 actionable subtasks. Return JSON only:
-                        {"subtasks":[{"title":"...","priority":"low|medium|high","tags":["..."]}]}
-                        Task: %s
-                        Description: %s
-                        """.formatted(request.title(), request.description());
-                Decomposition result = mapper.readValue(call(prompt), Decomposition.class);
-                return new Decomposition(result.subtasks(), "llm");
-            } catch (Exception ignored) {
+                return circuitBreaker.executeSupplier(() -> {
+                    String prompt = """
+                            Break this task into 3-6 actionable subtasks. Return JSON only:
+                            {"subtasks":[{"title":"...","priority":"low|medium|high","tags":["..."]}]}
+                            Task: %s
+                            Description: %s
+                            """.formatted(request.title(), request.description());
+                    try {
+                        Decomposition result = mapper.readValue(call(prompt), Decomposition.class);
+                        return new Decomposition(result.subtasks(), "llm");
+                    } catch (Exception exception) {
+                        throw new IllegalStateException("AI provider request failed", exception);
+                    }
+                });
+            } catch (RuntimeException ignored) {
                 // Fall through to deterministic suggestions.
             }
         }

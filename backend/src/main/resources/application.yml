@@ -5,6 +5,18 @@ spring:
     url: ${DB_URL:jdbc:h2:mem:tasks;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
     username: ${DB_USERNAME:sa}
     password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:16}
+      minimum-idle: ${DB_POOL_MIN:2}
+      connection-timeout: 2000
+      validation-timeout: 1000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+      repositories:
+        enabled: false
   jpa:
     open-in-view: false
     hibernate:
@@ -18,17 +30,62 @@ spring:
     enabled: true
 
 management:
+  health:
+    redis:
+      enabled: ${CACHE_REDIS_ENABLED:false}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 app:
+  cache:
+    local-max-size: ${CACHE_LOCAL_MAX_SIZE:10000}
+    local-ttl: ${CACHE_LOCAL_TTL:60s}
+    redis-enabled: ${CACHE_REDIS_ENABLED:false}
+    redis-ttl: ${CACHE_REDIS_TTL:5m}
+  executors:
+    ai:
+      core-size: ${AI_POOL_CORE:4}
+      max-size: ${AI_POOL_MAX:12}
+      queue-capacity: ${AI_QUEUE_CAPACITY:100}
+    indexing:
+      core-size: ${INDEX_POOL_CORE:2}
+      max-size: ${INDEX_POOL_MAX:4}
+      queue-capacity: ${INDEX_QUEUE_CAPACITY:500}
   ai:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
     model: ${OPENAI_MODEL:gpt-4o-mini}
+  vector:
+    enabled: ${CHROMA_ENABLED:false}
+    base-url: ${CHROMA_URL:http://localhost:8000/api/v1}
+    collection: tasks
+    reconcile-delay: ${CHROMA_RECONCILE_DELAY:10m}
 
 server:
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 1024
   error:
     include-message: never
+
+spring.lifecycle.timeout-per-shutdown-phase: 20s
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiProvider:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+      chroma:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s

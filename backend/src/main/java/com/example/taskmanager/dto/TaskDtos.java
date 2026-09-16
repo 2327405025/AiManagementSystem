@@ -19,7 +19,8 @@ public final class TaskDtos {
             TaskStatus status,
             Priority priority,
             Instant dueAt,
-            @Size(max = 20) Set<@NotBlank @Size(max = 50) String> tags
+            @Size(max = 20) Set<@NotBlank @Size(max = 50) String> tags,
+            Long version
     ) {}
 
     public record TaskResponse(
@@ -32,7 +33,8 @@ public final class TaskDtos {
             Instant createdAt,
             Instant updatedAt,
             Set<String> tags,
-            Set<Long> dependencyIds
+            Set<Long> dependencyIds,
+            long version
     ) {}
 
     public record DependencyNode(
@@ -54,4 +56,10 @@ public final class TaskDtos {
                     result.getTotalElements(), result.getTotalPages());
         }
     }
+
+    public record CursorPage(
+            List<TaskResponse> content,
+            String nextCursor,
+            boolean hasNext
+    ) {}
 }

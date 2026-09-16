@@ -2,6 +2,7 @@ package com.example.taskmanager.controller;
 
 import com.example.taskmanager.domain.Priority;
 import com.example.taskmanager.domain.TaskStatus;
+import com.example.taskmanager.dto.TaskDtos.CursorPage;
 import com.example.taskmanager.dto.TaskDtos.DependencyNode;
 import com.example.taskmanager.dto.TaskDtos.TaskPage;
 import com.example.taskmanager.dto.TaskDtos.TaskRequest;
@@ -67,6 +68,16 @@ public class TaskController {
                 .orElseThrow(() -> new IllegalArgumentException("direction must be asc or desc"));
         return TaskPage.from(service.list(status, priority, tag, query,
                 PageRequest.of(page, size, Sort.by(sortDirection, sort))));
+    }
+
+    @GetMapping("/cursor")
+    CursorPage listByCursor(
+            @RequestParam(required = false) String after,
+            @RequestParam(defaultValue = "50") int size) {
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException("size must be between 1 and 100");
+        }
+        return service.listByCursor(after, size);
     }
 
     @PutMapping("/{id}")

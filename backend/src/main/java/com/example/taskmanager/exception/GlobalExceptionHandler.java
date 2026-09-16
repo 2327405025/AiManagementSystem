@@ -2,6 +2,7 @@ package com.example.taskmanager.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -11,6 +12,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,6 +41,20 @@ public class GlobalExceptionHandler {
     ResponseEntity<Problem> handleMalformedInput(Exception exception, HttpServletRequest request) {
         return ResponseEntity.badRequest()
                 .body(problem(400, "Malformed or unsupported field value", request.getRequestURI(), null));
+    }
+
+    @ExceptionHandler(RejectedExecutionException.class)
+    ResponseEntity<Problem> handleOverloaded(RejectedExecutionException exception, HttpServletRequest request) {
+        return ResponseEntity.status(429)
+                .body(problem(429, "AI service is busy; retry later", request.getRequestURI(), null));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<Problem> handleConcurrentUpdate(
+            ObjectOptimisticLockingFailureException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(409)
+                .body(problem(409, "Task was modified concurrently; reload and retry", request.getRequestURI(), null));
     }
 
     private Problem problem(int status, String message, String path, Map<String, String> fields) {
