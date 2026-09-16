@@ -1,4 +1,4 @@
-import type { Decomposition, Page, Priority, Task, TaskInput, TaskStatus, TaskSuggestion } from './types'
+import type { Decomposition, DependencyNode, Page, Priority, Task, TaskInput, TaskStatus, TaskSuggestion } from './types'
 
 const API = import.meta.env.VITE_API_URL ?? ''
 const TOKEN_KEY = 'taskmanager.token'
@@ -103,6 +103,10 @@ export async function listTasks(filters: TaskFilters) {
   return request<Page<Task>>(`/api/tasks?${params}`)
 }
 
+export function listTaskCatalog() {
+  return request<Page<Task>>('/api/tasks?page=0&size=100&sort=createdAt&direction=desc')
+}
+
 export function createTask(input: TaskInput) {
   return request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(input) })
 }
@@ -113,6 +117,33 @@ export function updateTask(id: number, input: TaskInput) {
 
 export function deleteTask(id: number) {
   return request<void>(`/api/tasks/${id}`, { method: 'DELETE' })
+}
+
+export function addDependency(taskId: number, dependencyId: number) {
+  return request<Task>(`/api/tasks/${taskId}/dependencies/${dependencyId}`, { method: 'POST' })
+}
+
+export function removeDependency(taskId: number, dependencyId: number) {
+  return request<void>(`/api/tasks/${taskId}/dependencies/${dependencyId}`, { method: 'DELETE' })
+}
+
+export function getDependencyTree(id: number) {
+  return request<DependencyNode>(`/api/tasks/${id}/dependency-tree`)
+}
+
+export async function syncDependencies(taskId: number, previousIds: number[], nextIds: number[]) {
+  const previous = new Set(previousIds)
+  const next = new Set(nextIds)
+  for (const dependencyId of next) {
+    if (!previous.has(dependencyId)) {
+      await addDependency(taskId, dependencyId)
+    }
+  }
+  for (const dependencyId of previous) {
+    if (!next.has(dependencyId)) {
+      await removeDependency(taskId, dependencyId)
+    }
+  }
 }
 
 export function parseTask(text: string) {

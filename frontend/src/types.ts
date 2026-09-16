@@ -45,3 +45,10 @@ export interface Decomposition {
   subtasks: Array<{ title: string; priority: Priority; tags: string[] }>
   source: 'llm' | 'rules'
 }
+
+export interface DependencyNode {
+  id: number
+  title: string
+  status: TaskStatus
+  dependencies: DependencyNode[]
+}

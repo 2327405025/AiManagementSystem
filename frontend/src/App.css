@@ -95,6 +95,27 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .task-actions button { padding: 7px 9px; font-size: 12px; }
 .subtasks { display: grid; gap: 5px; margin: 0 0 14px; padding: 10px; border-radius: 8px; background: var(--subtle); font-size: 11px; }
 .subtasks strong { color: var(--accent); }
+.dep-picker { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; }
+.dep-picker legend { padding: 0 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.dep-picker p { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0; }
+.dep-options { display: grid; gap: 6px; max-height: 160px; overflow: auto; }
+.dep-option { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.dep-option input { width: 16px; height: 16px; accent-color: var(--accent); }
+.dep-empty { color: var(--muted); font-size: 12px; }
+.dep-block { display: grid; gap: 8px; margin: 0 0 14px; padding: 10px; border-radius: 8px; background: var(--subtle); }
+.dep-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.dep-heading strong { color: var(--accent); font-size: 11px; }
+.dep-heading .text-button { padding: 0; font-size: 11px; }
+.dep-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dep-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--text); font-size: 12px; }
+.dep-list .text-button { padding: 0; font-size: 11px; }
+.dep-block select { width: 100%; padding: 7px 10px; font-size: 12px; }
+.dep-tree-box { padding-top: 6px; border-top: 1px solid var(--border); }
+.dep-tree { margin: 4px 0 0; padding-left: 16px; color: var(--text); font-size: 12px; line-height: 1.6; }
+.dep-status { display: inline-block; margin-right: 6px; border-radius: 100px; padding: 1px 6px; font-size: 10px; font-weight: 700; background: var(--surface); }
+.dep-status.completed { color: #34735a; }
+.dep-status.in_progress { color: #96701c; }
+.dep-status.pending { color: var(--muted); }
 .notice, .empty { padding: 36px; text-align: center; color: var(--muted); }
 .notice.error { color: var(--danger); background: #fff1f0; border-radius: 10px; margin-bottom: 16px; }
 .empty span { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 22px; }

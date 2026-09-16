@@ -1,21 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import {
+  addDependency,
   clearSession,
   createTask,
   decomposeTask,
   deleteTask,
+  getDependencyTree,
   getStoredUsername,
   getToken,
+  listTaskCatalog,
   listTasks,
   loginAccount,
   parseTask,
   registerAccount,
+  removeDependency,
   saveSession,
   setUnauthorizedHandler,
+  syncDependencies,
   updateTask,
 } from './api'
-import type { Decomposition, Page, Priority, Task, TaskInput, TaskStatus } from './types'
+import type { Decomposition, DependencyNode, Page, Priority, Task, TaskInput, TaskStatus } from './types'
 import './App.css'
 
 const emptyDraft: TaskInput = {
@@ -45,9 +50,11 @@ function App() {
   const [filters, setFilters] = useState({ query: '', status: '', priority: '', page: 0, smart: false })
   const [draft, setDraft] = useState<TaskInput>(emptyDraft)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [draftDeps, setDraftDeps] = useState<number[]>([])
   const [tags, setTags] = useState('')
   const [aiText, setAiText] = useState('')
   const [decompositions, setDecompositions] = useState<Record<number, Decomposition>>({})
+  const [treeTaskId, setTreeTaskId] = useState<number | null>(null)
 
   // Filters are part of the key so each server result has an independent cache entry.
   // 筛选条件进入查询键，使每组服务端结果拥有独立缓存。
@@ -64,7 +71,30 @@ function App() {
     }),
   })
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  const catalog = useQuery({
+    queryKey: ['task-catalog'],
+    enabled: signedIn,
+    queryFn: listTaskCatalog,
+  })
+
+  const tree = useQuery({
+    queryKey: ['dependency-tree', treeTaskId],
+    enabled: signedIn && treeTaskId != null,
+    queryFn: () => getDependencyTree(treeTaskId!),
+  })
+
+  const titlesById = useMemo(() => {
+    const titles = new Map<number, string>()
+    for (const task of catalog.data?.content ?? []) titles.set(task.id, task.title)
+    for (const task of tasks.data?.content ?? []) titles.set(task.id, task.title)
+    return titles
+  }, [catalog.data, tasks.data])
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    queryClient.invalidateQueries({ queryKey: ['task-catalog'] })
+    queryClient.invalidateQueries({ queryKey: ['dependency-tree'] })
+  }
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -76,9 +106,17 @@ function App() {
   }, [queryClient])
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const input = { ...draft, tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean) }
-      return editingId ? updateTask(editingId, input) : createTask(input)
+      if (editingId) {
+        const previous = findTask(editingId, catalog.data, tasks.data)?.dependencyIds ?? []
+        const updated = await updateTask(editingId, input)
+        await syncDependencies(editingId, previous, draftDeps)
+        return updated
+      }
+      const created = await createTask(input)
+      await syncDependencies(created.id, [], draftDeps)
+      return created
     },
     onSuccess: () => {
       resetForm()
@@ -119,6 +157,18 @@ function App() {
     onSuccess: refresh,
   })
 
+  const linkDependency = useMutation({
+    mutationFn: ({ taskId, dependencyId }: { taskId: number; dependencyId: number }) =>
+      addDependency(taskId, dependencyId),
+    onSuccess: refresh,
+  })
+
+  const unlinkDependency = useMutation({
+    mutationFn: ({ taskId, dependencyId }: { taskId: number; dependencyId: number }) =>
+      removeDependency(taskId, dependencyId),
+    onSuccess: refresh,
+  })
+
   const parse = useMutation({
     mutationFn: parseTask,
     onSuccess: (suggestion) => {
@@ -145,6 +195,7 @@ function App() {
   function resetForm() {
     setDraft(emptyDraft)
     setTags('')
+    setDraftDeps([])
     setEditingId(null)
   }
 
@@ -159,6 +210,7 @@ function App() {
       tags: task.tags,
       version: task.version,
     })
+    setDraftDeps(task.dependencyIds ?? [])
     setTags(task.tags.join(', '))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -168,7 +220,15 @@ function App() {
     save.mutate()
   }
 
-  const operationError = save.error || changeStatus.error || remove.error || parse.error || decompose.error
+  function toggleDep(id: number) {
+    setDraftDeps((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    )
+  }
+
+  const pickerTasks = (catalog.data?.content ?? []).filter((task) => task.id !== editingId)
+  const operationError = save.error || changeStatus.error || remove.error || parse.error
+    || decompose.error || linkDependency.error || unlinkDependency.error
 
   if (!signedIn) {
     return (
@@ -273,6 +333,26 @@ function App() {
                 <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="工作, 后端" />
               </label>
             </div>
+            <fieldset className="dep-picker">
+              <legend>前置依赖</legend>
+              <p>完成当前任务前必须先完成这些任务。自依赖和环会被后端拒绝。</p>
+              {pickerTasks.length === 0 ? (
+                <span className="dep-empty">还没有其他任务可依赖。</span>
+              ) : (
+                <div className="dep-options">
+                  {pickerTasks.map((task) => (
+                    <label key={task.id} className="dep-option">
+                      <input
+                        type="checkbox"
+                        checked={draftDeps.includes(task.id)}
+                        onChange={() => toggleDep(task.id)}
+                      />
+                      <span>#{task.id} {task.title}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
             <button className="primary" disabled={save.isPending}>
               {save.isPending ? '保存中…' : editingId ? '保存修改' : '添加任务'}
             </button>
@@ -320,38 +400,96 @@ function App() {
         )}
 
         <div className="task-grid">
-          {tasks.data?.content.map((task) => (
-            <article className={`task-card ${task.status === 'completed' ? 'done' : ''}`} key={task.id}>
-              <div className="task-meta">
-                <span className={`priority ${task.priority}`}>{priorityLabel[task.priority]}优先级</span>
-                <span className="task-id">#{task.id}</span>
-              </div>
-              <h3>{task.title}</h3>
-              {task.description && <p>{task.description}</p>}
-              <div className="tags">
-                {task.tags.map((tag) => <span key={tag}>#{tag}</span>)}
-                {task.dependencyIds.length > 0 && <span>依赖 {task.dependencyIds.length}</span>}
-              </div>
-              {decompositions[task.id] && (
-                <div className="subtasks">
-                  <strong>AI 建议步骤</strong>
-                  {decompositions[task.id].subtasks.map((item) => <span key={item.title}>· {item.title}</span>)}
+          {tasks.data?.content.map((task) => {
+            const dependencyIds = task.dependencyIds ?? []
+            const candidates = (catalog.data?.content ?? []).filter(
+              (item) => item.id !== task.id && !dependencyIds.includes(item.id),
+            )
+            return (
+              <article className={`task-card ${task.status === 'completed' ? 'done' : ''}`} key={task.id}>
+                <div className="task-meta">
+                  <span className={`priority ${task.priority}`}>{priorityLabel[task.priority]}优先级</span>
+                  <span className="task-id">#{task.id}</span>
                 </div>
-              )}
-              <div className="task-actions">
-                <select
-                  aria-label={`${task.title}的状态`}
-                  value={task.status}
-                  onChange={(event) => changeStatus.mutate({ task, status: event.target.value as TaskStatus })}
-                >
-                  {Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-                <button title="AI 拆解" onClick={() => decompose.mutate(task)}>✦</button>
-                <button onClick={() => edit(task)}>编辑</button>
-                <button className="danger" onClick={() => window.confirm(`删除“${task.title}”？`) && remove.mutate(task.id)}>删除</button>
-              </div>
-            </article>
-          ))}
+                <h3>{task.title}</h3>
+                {task.description && <p>{task.description}</p>}
+                <div className="tags">
+                  {task.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+                </div>
+                <div className="dep-block">
+                  <div className="dep-heading">
+                    <strong>前置依赖</strong>
+                    <button
+                      className="text-button"
+                      onClick={() => setTreeTaskId((current) => current === task.id ? null : task.id)}
+                    >
+                      {treeTaskId === task.id ? '收起树' : '依赖树'}
+                    </button>
+                  </div>
+                  {dependencyIds.length === 0 ? (
+                    <span className="dep-empty">无</span>
+                  ) : (
+                    <ul className="dep-list">
+                      {dependencyIds.map((dependencyId) => (
+                        <li key={dependencyId}>
+                          <span>#{dependencyId} {titlesById.get(dependencyId) ?? '任务'}</span>
+                          <button
+                            className="text-button danger"
+                            onClick={() => unlinkDependency.mutate({ taskId: task.id, dependencyId })}
+                          >
+                            移除
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <select
+                    aria-label={`为${task.title}添加依赖`}
+                    value=""
+                    disabled={candidates.length === 0 || linkDependency.isPending}
+                    onChange={(event) => {
+                      const dependencyId = Number(event.target.value)
+                      if (dependencyId) linkDependency.mutate({ taskId: task.id, dependencyId })
+                    }}
+                  >
+                    <option value="">{candidates.length === 0 ? '没有可添加的任务' : '添加依赖…'}</option>
+                    {candidates.map((item) => (
+                      <option key={item.id} value={item.id}>#{item.id} {item.title}</option>
+                    ))}
+                  </select>
+                  {treeTaskId === task.id && (
+                    <div className="dep-tree-box">
+                      {tree.isLoading && <span className="dep-empty">加载依赖树…</span>}
+                      {tree.error && <span className="dep-empty">{tree.error.message}</span>}
+                      {tree.data && (
+                        tree.data.dependencies.length === 0
+                          ? <span className="dep-empty">这棵树还没有子节点。</span>
+                          : <DependencyTree node={tree.data} />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {decompositions[task.id] && (
+                  <div className="subtasks">
+                    <strong>AI 建议步骤</strong>
+                    {decompositions[task.id].subtasks.map((item) => <span key={item.title}>· {item.title}</span>)}
+                  </div>
+                )}
+                <div className="task-actions">
+                  <select
+                    aria-label={`${task.title}的状态`}
+                    value={task.status}
+                    onChange={(event) => changeStatus.mutate({ task, status: event.target.value as TaskStatus })}
+                  >
+                    {Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <button title="AI 拆解" onClick={() => decompose.mutate(task)}>✦</button>
+                  <button onClick={() => edit(task)}>编辑</button>
+                  <button className="danger" onClick={() => window.confirm(`删除“${task.title}”？`) && remove.mutate(task.id)}>删除</button>
+                </div>
+              </article>
+            )
+          })}
         </div>
 
         {!filters.smart && (tasks.data?.totalPages ?? 0) > 1 && (
@@ -367,6 +505,25 @@ function App() {
 }
 
 export default App
+
+function findTask(id: number, catalog?: Page<Task>, page?: Page<Task>) {
+  return catalog?.content.find((task) => task.id === id)
+    ?? page?.content.find((task) => task.id === id)
+}
+
+function DependencyTree({ node }: { node: DependencyNode }) {
+  return (
+    <ul className="dep-tree">
+      {node.dependencies.map((child) => (
+        <li key={child.id}>
+          <span className={`dep-status ${child.status}`}>{statusLabel[child.status]}</span>
+          #{child.id} {child.title}
+          {child.dependencies.length > 0 && <DependencyTree node={child} />}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (username: string) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
