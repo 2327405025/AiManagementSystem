@@ -29,6 +29,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * Provider-neutral AI service using the OpenAI-compatible chat protocol.
+ *
+ * <p>DeepSeek works by changing only the base URL and model. External failures
+ * are circuit-broken and converted to deterministic local suggestions.</p>
+ */
 @Service
 public class AiService {
     private static final Pattern HOUR = Pattern.compile("(下午|晚上|pm)?\\s*(\\d{1,2})\\s*(?:点|:00)", Pattern.CASE_INSENSITIVE);

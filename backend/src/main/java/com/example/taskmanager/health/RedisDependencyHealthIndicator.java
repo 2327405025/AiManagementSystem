@@ -6,6 +6,12 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
 
+/**
+ * Reports optional Redis failures without taking the service out of rotation.
+ *
+ * <p>The readiness group maps {@code DEGRADED} to HTTP 200 because task reads
+ * safely fall back to PostgreSQL. Database failures still report DOWN.</p>
+ */
 @Component("redisDependency")
 public class RedisDependencyHealthIndicator implements HealthIndicator {
     private final RedisConnectionFactory connectionFactory;

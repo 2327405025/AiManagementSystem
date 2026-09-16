@@ -10,6 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import java.time.Instant;
 
 public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificationExecutor<Task> {
+    /**
+     * Stable keyset pagination avoids the increasing scan cost of deep offsets.
+     * The ID tie-breaker preserves ordering when timestamps are equal.
+     */
     @Query("""
             SELECT task FROM Task task
             WHERE :createdAt IS NULL

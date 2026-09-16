@@ -11,6 +11,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ThreadPoolExecutor;
 
+/**
+ * Isolates latency-prone AI calls from best-effort vector indexing.
+ *
+ * <p>The AI pool rejects excess work so overload is visible as HTTP 429. The
+ * indexing pool applies caller-runs backpressure because dropping committed
+ * task changes would increase reconciliation lag.</p>
+ */
 @Configuration
 @EnableAsync
 @EnableScheduling

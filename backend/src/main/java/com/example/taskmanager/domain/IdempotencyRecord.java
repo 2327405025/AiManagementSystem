@@ -7,6 +7,10 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
+/**
+ * Durable mapping from a client retry key to its created task.
+ * The primary-key constraint is the final guard against concurrent duplicates.
+ */
 @Entity
 @Table(name = "idempotency_records")
 public class IdempotencyRecord {

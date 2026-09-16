@@ -11,6 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
+/**
+ * Repairs the small crash window between a database commit and asynchronous
+ * vector indexing. The bounded recent batch keeps reconciliation inexpensive.
+ */
 @Component
 public class TaskIndexReconciler {
     private final TaskRepository repository;

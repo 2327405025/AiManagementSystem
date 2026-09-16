@@ -15,6 +15,13 @@ import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
+/**
+ * Two-level cache for immutable task DTOs.
+ *
+ * <p>Caffeine provides per-process request coalescing and Redis provides a
+ * shared L2. Every Redis operation is fail-open because cache availability
+ * must never determine task availability.</p>
+ */
 @Component
 public class TaskCache {
     private static final String KEY_PREFIX = "task:v1:";
@@ -44,6 +51,8 @@ public class TaskCache {
     }
 
     public TaskResponse getOrLoad(Long id, Supplier<TaskResponse> loader) {
+        // Caffeine invokes the mapping function once per key, preventing a
+        // burst of identical misses from stampeding PostgreSQL.
         return local.get(id, key -> loadFromRedis(key).orElseGet(() -> {
             TaskResponse loaded = loader.get();
             writeToRedis(loaded);
@@ -72,6 +81,7 @@ public class TaskCache {
             return;
         }
         try {
+            // Jitter prevents a large batch of entries from expiring together.
             Duration jitteredTtl = redisTtl.plusSeconds(ThreadLocalRandom.current().nextLong(61));
             redis.opsForValue().set(key(task.id()), mapper.writeValueAsString(task), jitteredTtl);
         } catch (Exception ignored) {

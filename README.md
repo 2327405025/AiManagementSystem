@@ -1,5 +1,7 @@
 # 智能任务管理系统
 
+[English documentation](README.en.md)
+
 ## 岗位方向
 全栈 + AI/LLM
 
@@ -43,23 +45,44 @@ npm run dev
 访问 http://localhost:5173。API 位于 http://localhost:8080，健康检查为 `/actuator/health`。
 
 ### 方式二：完整 Docker 栈
-```bash
-cp .env.example .env       # 可选：填写 OPENAI_API_KEY
-docker compose up --build
+Windows PowerShell：
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+docker compose up --build -d
+docker compose ps
 ```
 
 该方式启动 PostgreSQL、Redis、ChromaDB、后端与前端。仍访问 http://localhost:5173；停止并保留数据：`docker compose down`。
+首次启动需要下载镜像及 Chroma 嵌入模型，耗时会明显长于后续启动。查看后端日志：`docker compose logs -f backend`。
 
-### AI 配置
+### DeepSeek AI 配置
 支持 OpenAI Chat Completions 兼容服务：
 
 ```env
-OPENAI_API_KEY=...
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_API_KEY=你的_DeepSeek_API_Key
+OPENAI_BASE_URL=https://api.deepseek.com/v1
+OPENAI_MODEL=deepseek-flash
 ```
 
-Key 未配置、超时或服务异常时会降级到确定性规则，并在响应 `source` 中返回 `rules`；密钥不会进入仓库。
+变量沿用 `OPENAI_*` 命名是因为代码使用 OpenAI 兼容协议，并不限定供应商。请只把真实 Key 写入被 Git 忽略的 `.env`，不要修改或提交 `.env.example`。
+如果 DeepSeek 控制台为你的账号展示了不同模型名，请用控制台中的名称替换 `OPENAI_MODEL`。
+
+启动后验证：
+
+```powershell
+Invoke-RestMethod http://localhost:8080/livez
+Invoke-RestMethod http://localhost:8080/readyz
+
+$body = '{"text":"提醒我明天下午3点提交周报"}'
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:8080/api/ai/parse-task `
+  -ContentType application/json `
+  -Body $body
+```
+
+响应 `source: "llm"` 表示 DeepSeek 调用成功；`source: "rules"` 表示 Key 未配置、限流、超时或服务异常后采用本地降级。
 
 ## API 文档
 任务状态：`pending | in_progress | completed`；优先级：`low | medium | high`。

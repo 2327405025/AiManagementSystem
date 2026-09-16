@@ -18,6 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * HTTP adapter for the rebuildable Chroma task index.
+ *
+ * <p>Indexing is asynchronous and intentionally cannot roll back a committed
+ * task. Search callers own the keyword fallback when this adapter fails.</p>
+ */
 @Component
 public class ChromaTaskIndex {
     private final ObjectMapper mapper;
@@ -91,6 +97,8 @@ public class ChromaTaskIndex {
             return current;
         }
         synchronized (this) {
+            // Collection creation is lazy so local H2 development does not
+            // require Chroma unless vector search is explicitly enabled.
             if (collectionId == null) {
                 JsonNode collection = post("/collections", Map.of(
                         "name", collectionName,

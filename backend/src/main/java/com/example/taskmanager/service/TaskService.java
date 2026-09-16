@@ -37,6 +37,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Application service for task invariants.
+ *
+ * <p>PostgreSQL is authoritative. Cache eviction and vector-index events are
+ * deliberately deferred until commit so rolled-back writes never leak into
+ * derived stores.</p>
+ */
 @Service
 @Transactional(readOnly = true)
 public class TaskService {
@@ -61,6 +68,8 @@ public class TaskService {
         String key = normalizeIdempotencyKey(idempotencyKey);
         String requestHash = key == null ? null : hash(request);
         if (key != null) {
+            // A replay returns the original resource; reusing a key for a
+            // different payload is a client error.
             var existing = idempotencyRecords.findById(key);
             if (existing.isPresent()) {
                 if (!existing.get().getRequestHash().equals(requestHash)) {

@@ -52,6 +52,7 @@ public class Task {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // Prevents two editors from silently overwriting each other's updates.
     @Version
     @Column(nullable = false)
     private long version;

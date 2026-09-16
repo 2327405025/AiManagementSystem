@@ -33,6 +33,7 @@ function App() {
   const [aiText, setAiText] = useState('')
   const [decompositions, setDecompositions] = useState<Record<number, Decomposition>>({})
 
+  // Filters are part of the key so each server-side result has an independent cache entry.
   const queryKey = ['tasks', filters]
   const tasks = useQuery({
     queryKey,
@@ -70,6 +71,8 @@ function App() {
         version: task.version,
       }),
     onMutate: async ({ task, status }) => {
+      // Status changes feel immediate; the snapshot restores every affected
+      // query if the dependency guard or network request rejects the update.
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       const previous = queryClient.getQueriesData<Page<Task>>({ queryKey: ['tasks'] })
       queryClient.setQueriesData<Page<Task>>({ queryKey: ['tasks'] }, (page) => page && ({

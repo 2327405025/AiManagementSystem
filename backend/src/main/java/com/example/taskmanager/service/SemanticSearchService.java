@@ -6,6 +6,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+/**
+ * Keeps vector search optional: Chroma failures degrade to indexed database
+ * filtering instead of becoming user-visible availability failures.
+ */
 @Service
 public class SemanticSearchService {
     private final ChromaTaskIndex index;

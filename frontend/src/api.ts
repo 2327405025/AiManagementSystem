@@ -24,6 +24,7 @@ export interface TaskFilters {
 
 export async function listTasks(filters: TaskFilters) {
   if (filters.smart && filters.query) {
+    // Adapt semantic results to the same page shape consumed by the dashboard.
     const params = new URLSearchParams({ query: filters.query, limit: '20' })
     const result = await request<{ content: Task[]; source: 'vector' | 'keyword_fallback' }>(
       `/api/tasks/semantic-search?${params}`,
