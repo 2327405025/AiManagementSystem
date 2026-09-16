@@ -8,6 +8,8 @@ frontend/dist/
 
 # Environment and IDE
 .env
+.env.*
+!.env.example
 .idea/
 .vscode/
 *.iml

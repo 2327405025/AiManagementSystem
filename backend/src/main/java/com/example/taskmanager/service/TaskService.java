@@ -108,6 +108,8 @@ public class TaskService {
 
     @Retry(name = "taskRead")
     public CursorPage listByCursor(String cursor, int size) {
+        // Timestamp plus ID forms a total order even when several tasks share one instant.
+        // 时间戳与 ID 共同形成全序，确保同一时刻创建的任务也能稳定分页。
         Cursor value = decodeCursor(cursor);
         var slice = repository.findNextSlice(value.createdAt(), value.id(), PageRequest.of(0, size));
         List<TaskResponse> content = slice.getContent().stream().map(this::toResponse).toList();
@@ -145,6 +147,8 @@ public class TaskService {
         }
         Task task = require(taskId);
         Task dependency = require(dependencyId);
+        // Adding task -> dependency is safe only if dependency cannot already reach task.
+        // 仅当 dependency 无法到达 task 时，新增 task -> dependency 才不会形成环。
         if (reaches(dependency, taskId, new HashSet<>())) {
             throw ApiException.conflict("Dependency would create a cycle");
         }
@@ -282,6 +286,8 @@ public class TaskService {
     }
 
     private String hash(TaskRequest request) {
+        // Canonical tag ordering makes semantically identical retries hash identically.
+        // 标签排序后再计算规范化哈希，保证语义相同的重试得到相同结果。
         String sortedTags = request.tags() == null ? "" : request.tags().stream()
                 .map(String::trim)
                 .sorted(Comparator.naturalOrder())
@@ -311,6 +317,8 @@ public class TaskService {
     }
 
     private void afterCommit(Runnable action) {
+        // Running derived-store updates before commit could publish data that later rolls back.
+        // 派生存储若在提交前更新，可能发布随后被回滚的数据。
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             action.run();
             return;

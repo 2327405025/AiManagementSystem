@@ -5,6 +5,10 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.util.Locale;
 
+/**
+ * Persists enum names while exposing stable lowercase API values.
+ * 数据库保留枚举名称，API 对外提供稳定的小写值。
+ */
 public enum TaskStatus {
     PENDING,
     IN_PROGRESS,

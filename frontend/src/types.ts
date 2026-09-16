@@ -22,6 +22,8 @@ export interface TaskInput {
   priority?: Priority
   dueAt?: string | null
   tags?: string[]
+  // Sent on updates to reject stale edits; omitted when creating.
+  // 更新时用于拒绝过期编辑，创建任务时省略。
   version?: number
 }
 

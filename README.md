@@ -73,6 +73,8 @@ OPENAI_MODEL=deepseek-flash
 变量沿用 `OPENAI_*` 命名是因为代码使用 OpenAI 兼容协议，并不限定供应商。请只把真实 Key 写入被 Git 忽略的 `.env`，不要修改或提交 `.env.example`。
 如果 DeepSeek 控制台为你的账号展示了不同模型名，请用控制台中的名称替换 `OPENAI_MODEL`。
 
+`.env.example` 是可上传的公共模板，Key 留空；`.env` 是仅保存在本机的私人配置，已被 `.gitignore` 排除。不要将密钥写入 `VITE_*` 前端变量，否则会被打包到浏览器中。详细检查方法见[技术文档](docs/TECHNICAL.zh-CN.md#模板配置与私人配置)。
+
 启动后验证：
 
 ```powershell
@@ -144,6 +146,7 @@ flowchart LR
 ```
 
 - Controller 只处理 HTTP 与参数；Service 集中业务规则；Repository 只负责持久化；DTO 隔离 API 与实体。
+- PostgreSQL 与 MySQL 8 都足以承载 10 万任务；本项目选择 PostgreSQL 是因为任务依赖约束、`Instant` 时间语义、键集分页诊断能力，以及未来 JSONB/全文检索/pgvector 的演进空间。完整对比见[架构文档](docs/ARCHITECTURE.zh-CN.md#为什么选择-postgresql-而不是-mysql)。
 - `task_dependencies(task_id, depends_on_id)` 使用复合主键和双外键；服务层 DFS 防止环，数据库约束防止自依赖。
 - schema 由 Flyway 管理；常用筛选与 `(created_at, id)` 游标有复合索引，`version` 防止并发覆盖。
 - 按 ID 查询采用 Cache-Aside：Caffeine 原子加载合并同 Key 并发 miss，Redis TTL 为 5 分钟加 0–60 秒随机抖动；事务提交后精确失效，Redis 异常直接回源。

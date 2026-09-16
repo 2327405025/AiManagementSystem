@@ -10,6 +10,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * External task API contracts kept separate from mutable JPA entities.
+ * 与可变 JPA 实体隔离的任务 API 外部契约。
+ *
+ * <p>The request version is optional for creation and acts as an optimistic
+ * concurrency token for updates.</p>
+ * <p>创建时 version 可省略；更新时它作为乐观并发令牌。</p>
+ */
 public final class TaskDtos {
     private TaskDtos() {}
 

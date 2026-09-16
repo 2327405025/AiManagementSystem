@@ -80,6 +80,8 @@ OPENAI_MODEL=deepseek-flash
 The `OPENAI_*` names describe the compatible protocol and do not restrict the provider. Never put a real key in `.env.example` or commit `.env`.
 If the DeepSeek console shows a different model for your account, use that exact name as `OPENAI_MODEL`.
 
+`.env.example` is the public template with an empty key; `.env` is your private machine-only configuration and is excluded by `.gitignore`. Never place the key in a frontend `VITE_*` variable because it would be bundled into the browser. See the [technical guide](docs/TECHNICAL.en.md#template-vs-private-configuration) for verification commands.
+
 Verify the running stack:
 
 ```powershell
@@ -139,6 +141,7 @@ flowchart LR
 ```
 
 - Controllers handle HTTP concerns, services own business rules, repositories own persistence, and DTOs isolate the API from entities.
+- Both PostgreSQL and MySQL 8 can handle 100k tasks. PostgreSQL was selected for dependency constraints, `Instant` time semantics, keyset-query diagnostics, and future JSONB/full-text/pgvector options. See the [architecture comparison](docs/ARCHITECTURE.en.md#why-postgresql-instead-of-mysql).
 - Caffeine atomically coalesces concurrent misses for the same key. Redis TTL is five minutes plus 0–60 seconds of jitter. Writes evict after transaction commit.
 - Redis is optional: failures return `DEGRADED` health and reads fall back to PostgreSQL.
 - Only idempotent reads retry transient data-access failures (two attempts, 50 ms delay). Writes are never retried blindly.

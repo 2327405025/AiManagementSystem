@@ -7,6 +7,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Validates the public semantic-search contract; fallback behavior is owned by
+ * the service layer.
+ * 校验公开的语义搜索契约；搜索降级策略由服务层负责。
+ */
 @RestController
 @RequestMapping("/api/tasks")
 public class SearchController {

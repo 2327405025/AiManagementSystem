@@ -2,6 +2,8 @@ import type { Decomposition, Page, Priority, Task, TaskInput, TaskStatus, TaskSu
 
 const API = import.meta.env.VITE_API_URL ?? ''
 
+// Centralize JSON handling so every endpoint surfaces the backend Problem message.
+// 集中处理 JSON，使所有端点都能向界面展示后端统一的 Problem 错误信息。
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API}${path}`, {
     ...options,

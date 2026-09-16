@@ -28,9 +28,19 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.Set;
 
+/**
+ * REST boundary for task CRUD, pagination and dependency operations.
+ * 任务 CRUD、分页与依赖操作的 REST 边界。
+ *
+ * <p>Only transport validation belongs here; transactional invariants remain
+ * in {@link TaskService}.</p>
+ * <p>此处仅负责传输层校验；事务业务不变量统一保留在 {@link TaskService} 中。</p>
+ */
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
+    // Whitelisting prevents clients from injecting arbitrary entity paths into sorting.
+    // 排序字段采用白名单，防止客户端注入任意实体属性路径。
     private static final Set<String> SORT_FIELDS = Set.of("createdAt", "updatedAt", "priority", "status", "title");
     private final TaskService service;
 

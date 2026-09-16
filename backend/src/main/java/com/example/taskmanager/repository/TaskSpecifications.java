@@ -6,6 +6,10 @@ import com.example.taskmanager.domain.TaskStatus;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
+/**
+ * Composes optional task filters without duplicating repository methods.
+ * 组合可选任务筛选条件，避免为每种组合重复定义 Repository 方法。
+ */
 public final class TaskSpecifications {
     private TaskSpecifications() {}
 
@@ -16,6 +20,8 @@ public final class TaskSpecifications {
                 tag == null || tag.isBlank() ? null :
                         (root, ignored, cb) -> cb.equal(root.join("tags", JoinType.INNER), tag.trim().toLowerCase()),
                 query == null || query.isBlank() ? null : (root, ignored, cb) -> {
+                    // User input remains a bound parameter; it is never concatenated into SQL.
+                    // 用户输入始终作为绑定参数传递，不会直接拼接到 SQL 中。
                     var pattern = "%" + query.trim().toLowerCase() + "%";
                     return cb.or(
                             cb.like(cb.lower(root.get("title")), pattern),

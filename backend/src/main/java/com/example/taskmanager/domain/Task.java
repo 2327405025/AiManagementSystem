@@ -22,6 +22,13 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * Transactional task aggregate; dependencies are stored as a directed graph.
+ * 事务型任务聚合；任务依赖以有向图形式存储。
+ *
+ * <p>Lifecycle callbacks provide server-controlled UTC audit timestamps.</p>
+ * <p>生命周期回调生成由服务端控制的 UTC 审计时间。</p>
+ */
 @Entity
 @Table(name = "tasks")
 public class Task {

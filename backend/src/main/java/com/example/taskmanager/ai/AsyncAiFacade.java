@@ -10,6 +10,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Moves blocking provider calls onto the bounded AI executor and applies the
+ * API-level rate limit before work enters the queue.
+ * 将阻塞式供应商调用放入有界 AI 线程池，并在任务入队前应用 API 级限流。
+ */
 @Service
 public class AsyncAiFacade {
     private final AiService service;

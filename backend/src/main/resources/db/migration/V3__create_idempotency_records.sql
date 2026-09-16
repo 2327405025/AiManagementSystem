@@ -1,3 +1,5 @@
+-- Durable retry-key mapping; the primary key arbitrates concurrent creates.
+-- 持久化重试 Key 映射；主键负责裁决并发创建。
 CREATE TABLE idempotency_records (
     idempotency_key VARCHAR(100) PRIMARY KEY,
     request_hash VARCHAR(64) NOT NULL,

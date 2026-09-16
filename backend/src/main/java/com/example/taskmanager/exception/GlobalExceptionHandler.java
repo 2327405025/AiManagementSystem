@@ -16,6 +16,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 
+/**
+ * Converts domain, validation and overload failures into one stable API shape.
+ * 将领域、参数校验和过载异常转换为统一且稳定的 API 错误结构。
+ *
+ * <p>Internal exception details are intentionally not exposed to clients.</p>
+ * <p>内部异常细节不会直接暴露给客户端。</p>
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)

@@ -7,6 +7,11 @@ import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Keeps HTTP enum parsing consistent with lowercase JSON values and limits
+ * development CORS access to the Vite origin.
+ * 保持查询参数枚举与小写 JSON 值一致，并将开发环境 CORS 限制在 Vite 来源。
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
     @Override

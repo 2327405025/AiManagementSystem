@@ -42,6 +42,22 @@ Use the exact model shown in your account console if it differs. Other important
 - `AI_POOL_*` / `INDEX_POOL_*`: bounded executor and queue sizes.
 - `CHROMA_ENABLED` / `CHROMA_URL`: vector index switch and address.
 
+### Template vs. Private Configuration
+- `.env.example` is the public template. It contains an empty key, non-secret defaults and variable names.
+- `.env` is the private file on your machine and contains the real DeepSeek key. `.gitignore` ignores `.env` and other `.env.*` files while explicitly allowing `.env.example`.
+- Docker Compose reads the root `.env` at startup, so no secret is written into source code or the image.
+- Never put the key in a `VITE_*` variable. Vite bundles those values into browser assets where every visitor can read them.
+
+Check before committing:
+
+```powershell
+git check-ignore .env  # should print .env
+git ls-files .env      # should print nothing
+git status --short     # must not list .env
+```
+
+If a key was ever committed, deleting the file later is insufficient because Git history and existing clones may retain it. Revoke and regenerate the key in the DeepSeek console immediately.
+
 ## 4. Data and Consistency
 - Flyway executes `V1`–`V3` to create tasks, dependencies, optimistic locking, indexes and idempotency records.
 - `tasks.version` uses JPA `@Version` to detect concurrent overwrites.

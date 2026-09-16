@@ -42,6 +42,22 @@ OPENAI_MODEL=deepseek-flash
 - `AI_POOL_*` / `INDEX_POOL_*`：有界线程池大小与队列容量。
 - `CHROMA_ENABLED` / `CHROMA_URL`：向量索引开关与地址。
 
+### 模板配置与私人配置
+- `.env.example` 是可公开提交的通用模板，只包含空 Key、非敏感默认值和变量名称。
+- `.env` 是你机器上的私人配置，写入真实 DeepSeek Key；`.gitignore` 已忽略 `.env` 及其他 `.env.*` 文件，并单独放行 `.env.example`。
+- Docker Compose 在启动时读取根目录 `.env`，不会要求应用把密钥写入源码或镜像。
+- 不要把 Key 写入任何 `VITE_*` 变量；Vite 会把它们打包进浏览器资源，访问网页的人都能看到。
+
+提交前可执行：
+
+```powershell
+git check-ignore .env  # 应输出 .env
+git ls-files .env      # 应无输出
+git status --short     # 不应出现 .env
+```
+
+如果密钥曾被提交，即使之后删除文件也不代表安全，因为它仍可能存在于 Git 历史和他人的克隆中；应立即在 DeepSeek 控制台撤销并重新生成密钥。
+
 ## 4. 数据与一致性
 - Flyway 按顺序执行 `V1`–`V3`，创建任务、依赖、乐观锁、索引和幂等记录。
 - `tasks.version` 通过 JPA `@Version` 检测并发覆盖。

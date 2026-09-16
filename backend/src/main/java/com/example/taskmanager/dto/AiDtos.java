@@ -8,6 +8,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Validated AI request and suggestion contracts.
+ * 经过校验的 AI 请求与建议契约。
+ *
+ * <p>The source field makes provider output and deterministic fallback
+ * observable to clients.</p>
+ * <p>source 字段让客户端能够区分供应商输出与确定性规则降级。</p>
+ */
 public final class AiDtos {
     private AiDtos() {}
 

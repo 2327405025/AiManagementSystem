@@ -13,6 +13,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Non-blocking HTTP endpoints for AI suggestions and task decomposition.
+ * 提供 AI 建议与任务拆解的非阻塞 HTTP 端点。
+ *
+ * <p>Returned suggestions are never persisted automatically.</p>
+ * <p>返回的建议不会被自动写入数据库。</p>
+ */
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {

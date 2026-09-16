@@ -82,6 +82,17 @@ Docker Compose is a single-host development and demonstration topology, not real
 5. Scale from measured p95/p99 latency, pool waits and cache hit rates.
 
 ## 10. Architecture Decision Records
+### Why PostgreSQL Instead of MySQL
+PostgreSQL was not chosen because it is universally faster; either database can easily handle 100k tasks. It was selected because it better fits this model and its likely evolution:
+
+1. **Relational integrity first**: task dependencies form a graph with a composite primary key, two foreign keys and a check constraint. PostgreSQL has mature complex constraints, transaction semantics and recursive CTE support for moving very large dependency traversals into the database.
+2. **Clear time semantics**: entities use Java `Instant` and migrations use `TIMESTAMP WITH TIME ZONE`, avoiding ambiguity when server time zones change.
+3. **Stable deep pagination and diagnostics**: a `(created_at, id)` index supports keyset pagination; mature query plans, slow-query analysis and session-level `statement_timeout` help control tail latency.
+4. **Room for AI-data evolution**: ChromaDB currently handles vectors, while PostgreSQL full-text search, JSONB and pgvector provide a future option to reduce component count.
+5. **No primary-data dual writes**: tasks, tags, dependencies and idempotency records stay in one transactional database. Redis and Chroma remain rebuildable derivatives.
+
+MySQL 8 also supports transactions, foreign keys, recursive CTEs and composite indexes. It is a valid choice when a team has much stronger MySQL operations expertise, but Flyway SQL, temporal columns, connection parameters and query plans would need adjustment. The Spring Data JPA layering keeps controllers and most services independent from that migration.
+
 ### No RabbitMQ Yet
 The only current background job is a rebuildable vector index at low write volume. Post-commit events, bounded executors, circuit breaking and reconciliation are sufficient. RabbitMQ alone would not make database commits and message publication atomic.
 
