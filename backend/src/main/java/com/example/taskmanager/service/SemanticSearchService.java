@@ -1,6 +1,7 @@
 package com.example.taskmanager.service;
 
 import com.example.taskmanager.dto.VectorDtos.SemanticSearchResponse;
+import com.example.taskmanager.security.CurrentUser;
 import com.example.taskmanager.vector.ChromaTaskIndex;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -15,15 +16,17 @@ import org.springframework.stereotype.Service;
 public class SemanticSearchService {
     private final ChromaTaskIndex index;
     private final TaskService tasks;
+    private final CurrentUser currentUser;
 
-    public SemanticSearchService(ChromaTaskIndex index, TaskService tasks) {
+    public SemanticSearchService(ChromaTaskIndex index, TaskService tasks, CurrentUser currentUser) {
         this.index = index;
         this.tasks = tasks;
+        this.currentUser = currentUser;
     }
 
     public SemanticSearchResponse search(String query, int limit) {
         try {
-            var ids = index.search(query, limit);
+            var ids = index.search(query, limit, currentUser.id());
             return new SemanticSearchResponse(tasks.getMany(ids), "vector");
         } catch (RuntimeException exception) {
             var fallback = tasks.list(null, null, null, query,

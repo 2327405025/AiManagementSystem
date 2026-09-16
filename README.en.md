@@ -18,6 +18,7 @@ A quality-first task management sample: Spring Boot provides reliable task and d
 - Infrastructure: Caffeine, Resilience4j, Micrometer/Prometheus, Flyway, Docker Compose, GitHub Actions
 
 ## Implemented Features
+- [x] Registration, login, JWT and per-user task isolation
 - [x] Validated task CRUD with consistent error responses
 - [x] Filtering, keyword search, sorting, offset and cursor pagination
 - [x] Dependency graph, cycle detection, completion guards and tree queries
@@ -102,6 +103,9 @@ Statuses: `pending | in_progress | completed`. Priorities: `low | medium | high`
 
 | Method | Endpoint | Purpose |
 |---|---|---|
+| POST | `/api/auth/register` | Register and return a JWT |
+| POST | `/api/auth/login` | Login and return a JWT |
+| GET | `/api/auth/me` | Current user |
 | POST | `/api/tasks` | Create a task; supports `Idempotency-Key` |
 | GET | `/api/tasks/{id}` | Get one task |
 | GET | `/api/tasks` | Filter, sort and paginate |
@@ -140,7 +144,8 @@ flowchart LR
   IndexPool --> Chroma[(ChromaDB)]
 ```
 
-- Controllers handle HTTP concerns, services own business rules, repositories own persistence, and DTOs isolate the API from entities.
+- Controllers handle HTTP concerns, services own business rules, repositories own persistence, and DTOs isolate the API from entities. In Spring Data JPA this *is* Controller / Service / Mapper: `Repository` occupies the MyBatis Mapper slot.
+- The stack was not rewritten to MyBatis because optimistic locking, task graphs and Specifications already sit on JPA entities. Swapping XML mappers would change the persistence library, not the layering.
 - Both PostgreSQL and MySQL 8 can handle 100k tasks. PostgreSQL was selected for dependency constraints, `Instant` time semantics, keyset-query diagnostics, and future JSONB/full-text/pgvector options. See the [architecture comparison](docs/ARCHITECTURE.en.md#why-postgresql-instead-of-mysql).
 - Caffeine atomically coalesces concurrent misses for the same key. Redis TTL is five minutes plus 0–60 seconds of jitter. Writes evict after transaction commit.
 - Redis is optional: failures return `DEGRADED` health and reads fall back to PostgreSQL.
@@ -178,7 +183,7 @@ REQUESTS=1000 CONCURRENCY=25 node scripts/load-test.mjs
 Ten backend tests cover CRUD, idempotency, health probes, Redis degradation, pagination, cache invalidation and miss coalescing, optimistic locking, dependencies, semantic fallback and asynchronous AI.
 
 ## Known Limitations
-- No authentication or multi-tenancy.
+- JWT login without OAuth or role-based authorization.
 - The deterministic AI fallback recognizes only common English and Chinese date expressions.
 - Very large dependency graphs should use a bounded recursive CTE.
 - With multiple instances, L1 cache can be stale within its short TTL. Disable L1 for strict consistency or add Redis Pub/Sub invalidation.

@@ -13,6 +13,7 @@ import com.example.taskmanager.exception.ApiException;
 import com.example.taskmanager.repository.TaskRepository;
 import com.example.taskmanager.repository.TaskSpecifications;
 import com.example.taskmanager.repository.IdempotencyRecordRepository;
+import com.example.taskmanager.security.CurrentUser;
 import com.example.taskmanager.vector.TaskIndexEvent;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.context.ApplicationEventPublisher;
@@ -53,21 +54,24 @@ public class TaskService {
     private final IdempotencyRecordRepository idempotencyRecords;
     private final TaskCache cache;
     private final ApplicationEventPublisher events;
+    private final CurrentUser currentUser;
 
     public TaskService(
             TaskRepository repository,
             IdempotencyRecordRepository idempotencyRecords,
             TaskCache cache,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            CurrentUser currentUser) {
         this.repository = repository;
         this.idempotencyRecords = idempotencyRecords;
         this.cache = cache;
         this.events = events;
+        this.currentUser = currentUser;
     }
 
     @Transactional
     public TaskResponse create(TaskRequest request, String idempotencyKey) {
-        String key = normalizeIdempotencyKey(idempotencyKey);
+        String key = scopedIdempotencyKey(idempotencyKey);
         String requestHash = key == null ? null : hash(request);
         if (key != null) {
             // A replay returns the original resource; a different payload conflicts.
@@ -81,6 +85,7 @@ public class TaskService {
             }
         }
         Task task = new Task();
+        task.setOwnerId(currentUser.id());
         apply(task, request, true);
         TaskResponse response = toResponse(repository.saveAndFlush(task));
         if (key != null) {
@@ -92,17 +97,27 @@ public class TaskService {
 
     @Retry(name = "taskRead")
     public TaskResponse get(Long id) {
-        return cache.getOrLoad(id, () -> toResponse(require(id)));
+        TaskResponse cached = cache.getOrLoad(id, () -> toResponse(require(id)));
+        if (!currentUser.id().equals(cached.ownerId())) {
+            throw ApiException.notFound("Task", id);
+        }
+        return cached;
     }
 
     @Retry(name = "taskRead")
     public List<TaskResponse> getMany(List<Long> ids) {
-        return ids.stream().map(this::get).toList();
+        Long ownerId = currentUser.id();
+        return ids.stream()
+                .map(repository::findById)
+                .flatMap(java.util.Optional::stream)
+                .filter(task -> ownerId.equals(task.getOwnerId()))
+                .map(this::toResponse)
+                .toList();
     }
 
     @Retry(name = "taskRead")
     public Page<TaskResponse> list(TaskStatus status, Priority priority, String tag, String query, Pageable pageable) {
-        return repository.findAll(TaskSpecifications.filtered(status, priority, tag, query), pageable)
+        return repository.findAll(TaskSpecifications.filtered(currentUser.id(), status, priority, tag, query), pageable)
                 .map(this::toResponse);
     }
 
@@ -111,7 +126,7 @@ public class TaskService {
         // Timestamp plus ID forms a total order even when several tasks share one instant.
         // 时间戳与 ID 共同形成全序，确保同一时刻创建的任务也能稳定分页。
         Cursor value = decodeCursor(cursor);
-        var slice = repository.findNextSlice(value.createdAt(), value.id(), PageRequest.of(0, size));
+        var slice = repository.findNextSlice(currentUser.id(), value.createdAt(), value.id(), PageRequest.of(0, size));
         List<TaskResponse> content = slice.getContent().stream().map(this::toResponse).toList();
         String next = slice.hasNext() && !slice.getContent().isEmpty()
                 ? encodeCursor(slice.getContent().getLast())
@@ -223,14 +238,18 @@ public class TaskService {
     }
 
     private Task require(Long id) {
-        return repository.findById(id).orElseThrow(() -> ApiException.notFound("Task", id));
+        Task task = repository.findById(id).orElseThrow(() -> ApiException.notFound("Task", id));
+        if (!currentUser.id().equals(task.getOwnerId())) {
+            throw ApiException.notFound("Task", id);
+        }
+        return task;
     }
 
     private TaskResponse toResponse(Task task) {
         Set<Long> dependencies = task.getDependencies().stream()
                 .map(Task::getId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        return new TaskResponse(task.getId(), task.getTitle(), task.getDescription(), task.getStatus(),
+        return new TaskResponse(task.getId(), task.getOwnerId(), task.getTitle(), task.getDescription(), task.getStatus(),
                 task.getPriority(), task.getDueAt(), task.getCreatedAt(), task.getUpdatedAt(),
                 Set.copyOf(task.getTags()), dependencies, task.getVersion());
     }
@@ -274,7 +293,7 @@ public class TaskService {
 
     private record Cursor(Instant createdAt, Long id) {}
 
-    private String normalizeIdempotencyKey(String key) {
+    private String scopedIdempotencyKey(String key) {
         if (key == null || key.isBlank()) {
             return null;
         }
@@ -282,7 +301,7 @@ public class TaskService {
         if (normalized.length() > 100) {
             throw new IllegalArgumentException("Idempotency-Key must not exceed 100 characters");
         }
-        return normalized;
+        return currentUser.id() + ":" + normalized;
     }
 
     private String hash(TaskRequest request) {
@@ -336,7 +355,10 @@ public class TaskService {
                 + (task.getDescription() == null ? "" : task.getDescription()) + "\n"
                 + String.join(" ", task.getTags());
         return new TaskIndexEvent(task.getId(), document,
-                Map.of("status", task.getStatus().value(), "priority", task.getPriority().value()),
+                Map.of(
+                        "status", task.getStatus().value(),
+                        "priority", task.getPriority().value(),
+                        "ownerId", task.getOwnerId()),
                 TaskIndexEvent.Operation.UPSERT);
     }
 }

@@ -1,6 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type FormEvent, useState } from 'react'
-import { createTask, decomposeTask, deleteTask, listTasks, parseTask, updateTask } from './api'
+import { type FormEvent, useEffect, useState } from 'react'
+import {
+  clearSession,
+  createTask,
+  decomposeTask,
+  deleteTask,
+  getStoredUsername,
+  getToken,
+  listTasks,
+  loginAccount,
+  parseTask,
+  registerAccount,
+  saveSession,
+  setUnauthorizedHandler,
+  updateTask,
+} from './api'
 import type { Decomposition, Page, Priority, Task, TaskInput, TaskStatus } from './types'
 import './App.css'
 
@@ -26,6 +40,8 @@ const priorityLabel: Record<Priority, string> = {
 
 function App() {
   const queryClient = useQueryClient()
+  const [username, setUsername] = useState(() => getStoredUsername() ?? '')
+  const [signedIn, setSignedIn] = useState(() => Boolean(getToken()))
   const [filters, setFilters] = useState({ query: '', status: '', priority: '', page: 0, smart: false })
   const [draft, setDraft] = useState<TaskInput>(emptyDraft)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -38,6 +54,7 @@ function App() {
   const queryKey = ['tasks', filters]
   const tasks = useQuery({
     queryKey,
+    enabled: signedIn,
     queryFn: () => listTasks({
       page: filters.page,
       query: filters.query || undefined,
@@ -48,6 +65,15 @@ function App() {
   })
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setSignedIn(false)
+      setUsername('')
+      queryClient.clear()
+    })
+    return () => setUnauthorizedHandler(null)
+  }, [queryClient])
 
   const save = useMutation({
     mutationFn: () => {
@@ -144,6 +170,17 @@ function App() {
 
   const operationError = save.error || changeStatus.error || remove.error || parse.error || decompose.error
 
+  if (!signedIn) {
+    return (
+      <AuthScreen
+        onAuthenticated={(name) => {
+          setUsername(name)
+          setSignedIn(true)
+        }}
+      />
+    )
+  }
+
   return (
     <main>
       <header>
@@ -152,9 +189,25 @@ function App() {
           <h1>清晰工作，智能推进</h1>
           <p>管理任务、依赖关系，并让 AI 帮你快速开始。</p>
         </div>
-        <div className="task-count">
-          <strong>{tasks.data?.totalElements ?? 0}</strong>
-          <span>个任务</span>
+        <div className="header-actions">
+          <div className="task-count">
+            <strong>{tasks.data?.totalElements ?? 0}</strong>
+            <span>个任务</span>
+          </div>
+          <div className="session">
+            <span>{username}</span>
+            <button
+              className="text-button"
+              onClick={() => {
+                clearSession()
+                queryClient.clear()
+                setUsername('')
+                setSignedIn(false)
+              }}
+            >
+              退出
+            </button>
+          </div>
         </div>
       </header>
 
@@ -314,3 +367,73 @@ function App() {
 }
 
 export default App
+
+function AuthScreen({ onAuthenticated }: { onAuthenticated: (username: string) => void }) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const submit = useMutation({
+    mutationFn: () => mode === 'login'
+      ? loginAccount(username, password)
+      : registerAccount(username, password),
+    onSuccess: (session) => {
+      saveSession(session)
+      onAuthenticated(session.username)
+    },
+  })
+
+  return (
+    <main className="auth-page">
+      <section className="card auth-card">
+        <span className="eyebrow">SMART WORKSPACE</span>
+        <h1>{mode === 'login' ? '登录' : '注册'}</h1>
+        <p>任务按账号隔离。用户名 3–50 位字母数字或下划线，密码至少 8 位。</p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            submit.mutate()
+          }}
+        >
+          <label>
+            用户名
+            <input
+              required
+              minLength={3}
+              maxLength={50}
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="alice"
+              autoComplete="username"
+            />
+          </label>
+          <label>
+            密码
+            <input
+              required
+              type="password"
+              minLength={8}
+              maxLength={72}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="至少 8 位"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          </label>
+          {submit.error && <div className="notice error">{submit.error.message}</div>}
+          <button className="primary" disabled={submit.isPending}>
+            {submit.isPending ? '处理中…' : mode === 'login' ? '登录' : '创建账号'}
+          </button>
+        </form>
+        <button
+          className="text-button"
+          onClick={() => {
+            submit.reset()
+            setMode(mode === 'login' ? 'register' : 'login')
+          }}
+        >
+          {mode === 'login' ? '没有账号？去注册' : '已有账号？去登录'}
+        </button>
+      </section>
+    </main>
+  )
+}

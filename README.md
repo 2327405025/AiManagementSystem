@@ -18,6 +18,7 @@
 - 其他：Caffeine、Resilience4j、Micrometer/Prometheus、Flyway、Docker Compose、GitHub Actions
 
 ## 已实现功能
+- [x] 注册/登录、JWT、任务按账号隔离
 - [x] 任务 CRUD、输入验证、统一错误响应
 - [x] 按状态/优先级/标签/关键词筛选，排序与分页
 - [x] 任务依赖、环检测、完成前置检查、依赖树查询
@@ -95,6 +96,9 @@ Invoke-RestMethod -Method Post `
 
 | 方法 | 端点 | 说明 |
 |---|---|---|
+| POST | `/api/auth/register` | 注册并返回 JWT |
+| POST | `/api/auth/login` | 登录并返回 JWT |
+| GET | `/api/auth/me` | 当前登录用户 |
 | POST | `/api/tasks` | 创建任务 |
 | GET | `/api/tasks/{id}` | 查询单个任务 |
 | GET | `/api/tasks` | 筛选、排序和分页 |
@@ -114,17 +118,18 @@ Invoke-RestMethod -Method Post `
 深分页使用 `/api/tasks/cursor?size=50&after={nextCursor}`，避免数据库扫描并丢弃大量 offset 行。
 
 ```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"password12"}'
+
 curl -X POST http://localhost:8080/api/tasks \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Idempotency-Key: create-task-20260916-001" \
   -d '{"title":"发布 API","priority":"high","tags":["backend"]}'
-
-curl "http://localhost:8080/api/tasks?status=pending&sort=createdAt&direction=desc"
-
-curl -X POST http://localhost:8080/api/ai/parse-task \
-  -H "Content-Type: application/json" \
-  -d '{"text":"提醒我明天下午3点买杂货"}'
 ```
+
+除 `/api/auth/register`、`/api/auth/login` 和健康检查外，任务与 AI 接口都需要 `Authorization: Bearer`。任务按 `owner_id` 隔离，无法读取他人数据。
 
 冲突（环依赖、前置任务未完成）返回 `409`；资源不存在返回 `404`；验证失败返回带字段详情的 `400`。
 相同 `Idempotency-Key` 与相同请求体只创建一次；同一 Key 配合不同请求返回 `409`。并发竞争由数据库主键约束兜底，失败客户端可用同一 Key 安全重试。
@@ -145,7 +150,8 @@ flowchart LR
   IndexPool --> Vector[(ChromaDB)]
 ```
 
-- Controller 只处理 HTTP 与参数；Service 集中业务规则；Repository 只负责持久化；DTO 隔离 API 与实体。
+- Controller 只处理 HTTP 与参数；Service 集中业务规则；Repository 只负责持久化；DTO 隔离 API 与实体。这就是 Spring Data JPA 下的 Controller / Service / Mapper：`Repository` 对应 MyBatis 的 Mapper，不把 SQL XML 再铺一层。
+- 没有改成 MyBatis，是因为当前任务依赖、乐观锁 `@Version`、动态筛选 Specification 都建立在 JPA 实体上。硬改 Mapper 只会换掉持久化实现，分层并不会因此变得更传统。
 - PostgreSQL 与 MySQL 8 都足以承载 10 万任务；本项目选择 PostgreSQL 是因为任务依赖约束、`Instant` 时间语义、键集分页诊断能力，以及未来 JSONB/全文检索/pgvector 的演进空间。完整对比见[架构文档](docs/ARCHITECTURE.zh-CN.md#为什么选择-postgresql-而不是-mysql)。
 - `task_dependencies(task_id, depends_on_id)` 使用复合主键和双外键；服务层 DFS 防止环，数据库约束防止自依赖。
 - schema 由 Flyway 管理；常用筛选与 `(created_at, id)` 游标有复合索引，`version` 防止并发覆盖。
@@ -186,7 +192,7 @@ REQUESTS=1000 CONCURRENCY=25 node scripts/load-test.mjs
 后端 10 项测试覆盖 CRUD、幂等创建、健康探针、Redis 降级、筛选、offset/游标分页、缓存失效与并发 miss 合并、乐观锁、依赖约束、语义搜索降级和异步 AI。
 
 ## 已知限制
-- 无用户认证/多租户；规则降级只覆盖常见中英文时间表达。
+- 认证为单机 JWT，无 OAuth / 多角色权限模型；规则降级只覆盖常见中英文时间表达。
 - 依赖树按请求递归读取，超大图应改为递归 CTE 并限制深度。
 - 多实例启用 Caffeine 时可能在 TTL 内短暂读到旧值；严格一致部署应关闭 L1，或增加 Redis Pub/Sub 失效广播。
 - 暂未启用读写分离：10 万任务和少量实例下主从复制复杂度高于收益；代码已区分只读事务，达到主库读负载瓶颈后可接入 `AbstractRoutingDataSource`。

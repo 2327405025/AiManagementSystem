@@ -40,6 +40,7 @@ services:
       DB_URL: jdbc:postgresql://database:5432/tasks?options=-c%20statement_timeout=5000%20-c%20idle_in_transaction_session_timeout=10000
       DB_USERNAME: task_app
       DB_PASSWORD: task_app
+      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-32b}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}

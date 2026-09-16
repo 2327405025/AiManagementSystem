@@ -1,19 +1,74 @@
 import type { Decomposition, Page, Priority, Task, TaskInput, TaskStatus, TaskSuggestion } from './types'
 
 const API = import.meta.env.VITE_API_URL ?? ''
+const TOKEN_KEY = 'taskmanager.token'
+const USER_KEY = 'taskmanager.username'
+
+export interface AuthSession {
+  token: string
+  userId: number
+  username: string
+}
+
+let onUnauthorized: (() => void) | null = null
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function getStoredUsername() {
+  return localStorage.getItem(USER_KEY)
+}
+
+export function saveSession(session: AuthSession) {
+  localStorage.setItem(TOKEN_KEY, session.token)
+  localStorage.setItem(USER_KEY, session.username)
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
 
 // Centralize JSON handling so every endpoint surfaces the backend Problem message.
 // 集中处理 JSON，使所有端点都能向界面展示后端统一的 Problem 错误信息。
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken()
   const response = await fetch(`${API}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
   })
+  if (response.status === 401) {
+    clearSession()
+    onUnauthorized?.()
+  }
   if (!response.ok) {
     const problem = await response.json().catch(() => null)
     throw new Error(problem?.message ?? `请求失败 (${response.status})`)
   }
   return response.status === 204 ? (undefined as T) : response.json()
+}
+
+export function registerAccount(username: string, password: string) {
+  return request<AuthSession>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  })
+}
+
+export function loginAccount(username: string, password: string) {
+  return request<AuthSession>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  })
 }
 
 export interface TaskFilters {

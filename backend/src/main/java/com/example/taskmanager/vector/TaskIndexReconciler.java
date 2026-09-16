@@ -48,7 +48,10 @@ public class TaskIndexReconciler {
                 + (task.getDescription() == null ? "" : task.getDescription()) + "\n"
                 + String.join(" ", task.getTags());
         return new TaskIndexEvent(task.getId(), document,
-                Map.of("status", task.getStatus().value(), "priority", task.getPriority().value()),
+                Map.of(
+                        "status", task.getStatus().value(),
+                        "priority", task.getPriority().value(),
+                        "ownerId", task.getOwnerId()),
                 TaskIndexEvent.Operation.UPSERT);
     }
 }

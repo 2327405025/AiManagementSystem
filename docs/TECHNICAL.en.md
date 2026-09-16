@@ -15,7 +15,8 @@
 backend/
   controller/    HTTP parameters and responses
   service/       business rules and transaction boundaries
-  repository/    JPA data access
+  repository/    JPA data access (Mapper equivalent)
+  security/      JWT login and current user
   domain/        entities and enums
   cache/         Caffeine + Redis two-level cache
   ai/            OpenAI-compatible AI and rule fallback

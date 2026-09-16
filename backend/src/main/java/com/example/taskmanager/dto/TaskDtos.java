@@ -33,6 +33,7 @@ public final class TaskDtos {
 
     public record TaskResponse(
             Long id,
+            Long ownerId,
             String title,
             String description,
             TaskStatus status,

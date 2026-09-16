@@ -1,6 +1,9 @@
 spring:
   application:
     name: smart-task-manager
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
     url: ${DB_URL:jdbc:h2:mem:tasks;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
     username: ${DB_USERNAME:sa}
@@ -74,6 +77,9 @@ app:
       core-size: ${INDEX_POOL_CORE:2}
       max-size: ${INDEX_POOL_MAX:4}
       queue-capacity: ${INDEX_QUEUE_CAPACITY:500}
+  security:
+    jwt-secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-32b}
+    jwt-ttl: ${JWT_TTL:24h}
   ai:
     api-key: ${OPENAI_API_KEY:}
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}

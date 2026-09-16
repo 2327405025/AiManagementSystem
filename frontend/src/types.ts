@@ -13,6 +13,7 @@ export interface Task {
   tags: string[]
   dependencyIds: number[]
   version: number
+  ownerId?: number
 }
 
 export interface TaskInput {

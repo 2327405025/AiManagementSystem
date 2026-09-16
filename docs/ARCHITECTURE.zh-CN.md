@@ -24,7 +24,7 @@ Spring Boot 后端保持无状态，除 Caffeine 短期本地缓存外不保存�
 ## 3. 分层职责
 - Controller：协议转换、参数验证、HTTP 状态。
 - Service：事务边界、任务依赖、幂等、缓存和索引协调。
-- Repository：JPA 查询与持久化。
+- Repository：JPA 查询与持久化，对应传统 Java 项目里的 Mapper 层。当前未使用 MyBatis XML Mapper，因为 `@Version`、依赖图和动态 Specification 都建立在 JPA 实体上。
 - Domain/DTO：分别表达内部状态与外部 API 契约。
 - Adapter：Redis、DeepSeek、Chroma 等外部系统访问。
 

@@ -24,7 +24,7 @@ The Spring Boot backend is stateless apart from its short-lived Caffeine cache. 
 ## 3. Layer Responsibilities
 - Controller: protocol conversion, validation and HTTP status.
 - Service: transaction boundaries, dependencies, idempotency, cache and index coordination.
-- Repository: JPA queries and persistence.
+- Repository: JPA persistence, occupying the Mapper slot from a classic Java stack. MyBatis XML mappers were not added because `@Version`, the dependency graph and Specifications already sit on JPA entities.
 - Domain/DTO: internal state and external API contracts.
 - Adapter: Redis, DeepSeek, Chroma and other external systems.
 

@@ -15,7 +15,8 @@
 backend/
   controller/    HTTP 参数与响应
   service/       业务规则与事务边界
-  repository/    JPA 数据访问
+  repository/    JPA 数据访问（对应 Mapper）
+  security/      JWT 登录与当前用户
   domain/        实体和枚举
   cache/         Caffeine + Redis 两级缓存
   ai/            OpenAI 兼容 AI 与规则降级

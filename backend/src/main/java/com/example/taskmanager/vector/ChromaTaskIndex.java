@@ -71,13 +71,22 @@ public class ChromaTaskIndex {
 
     @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "chroma")
     public List<Long> search(String query, int limit) {
+        return search(query, limit, null);
+    }
+
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "chroma")
+    public List<Long> search(String query, int limit, Long ownerId) {
         if (!enabled) {
             throw new IllegalStateException("Vector search is disabled");
         }
-        JsonNode response = post("/collections/" + collectionId() + "/query", Map.of(
-                "query_texts", List.of(query),
-                "n_results", limit,
-                "include", List.of("distances", "metadatas")));
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("query_texts", List.of(query));
+        body.put("n_results", limit);
+        body.put("include", List.of("distances", "metadatas"));
+        if (ownerId != null) {
+            body.put("where", Map.of("ownerId", ownerId));
+        }
+        JsonNode response = post("/collections/" + collectionId() + "/query", body);
         List<Long> ids = new ArrayList<>();
         response.path("ids").path(0).forEach(node -> ids.add(Long.parseLong(node.asText())));
         return ids;

@@ -1,9 +1,11 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml .
-RUN mvn -q -DskipTests dependency:go-offline
 COPY src src
-RUN mvn -q -DskipTests package
+# -B prints download progress. go-offline is omitted because it pulls extra plugin
+# jars and often stalls or fails on interrupted Maven Central transfers.
+# -B 会打印下载进度。去掉 go-offline，避免额外插件依赖在弱网下下到一半失败。
+RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app

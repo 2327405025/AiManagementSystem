@@ -13,8 +13,10 @@ import org.springframework.data.jpa.domain.Specification;
 public final class TaskSpecifications {
     private TaskSpecifications() {}
 
-    public static Specification<Task> filtered(TaskStatus status, Priority priority, String tag, String query) {
+    public static Specification<Task> filtered(
+            Long ownerId, TaskStatus status, Priority priority, String tag, String query) {
         return Specification.allOf(
+                equal("ownerId", ownerId),
                 equal("status", status),
                 equal("priority", priority),
                 tag == null || tag.isBlank() ? null :

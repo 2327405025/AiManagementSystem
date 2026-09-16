@@ -49,7 +49,7 @@ class InfrastructureResilienceTest {
                 Duration.ofMinutes(5));
         AtomicInteger loads = new AtomicInteger();
         TaskResponse expected = new TaskResponse(
-                42L, "Hot task", null, TaskStatus.PENDING, Priority.MEDIUM,
+                42L, 7L, "Hot task", null, TaskStatus.PENDING, Priority.MEDIUM,
                 null, Instant.now(), Instant.now(), Set.of("cache"), Set.of(), 0);
 
         try (var executor = Executors.newFixedThreadPool(12)) {

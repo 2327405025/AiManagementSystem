@@ -17,10 +17,13 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
      */
     @Query("""
             SELECT task FROM Task task
-            WHERE :createdAt IS NULL
-               OR task.createdAt < :createdAt
-               OR (task.createdAt = :createdAt AND task.id < :id)
+            WHERE task.ownerId = :ownerId
+              AND (
+                    :createdAt IS NULL
+                    OR task.createdAt < :createdAt
+                    OR (task.createdAt = :createdAt AND task.id < :id)
+                  )
             ORDER BY task.createdAt DESC, task.id DESC
             """)
-    Slice<Task> findNextSlice(Instant createdAt, Long id, Pageable pageable);
+    Slice<Task> findNextSlice(Long ownerId, Instant createdAt, Long id, Pageable pageable);
 }

@@ -16,7 +16,7 @@ import java.time.Instant;
 @Table(name = "idempotency_records")
 public class IdempotencyRecord {
     @Id
-    @Column(name = "idempotency_key", length = 100)
+    @Column(name = "idempotency_key", length = 140)
     private String key;
 
     @Column(name = "request_hash", nullable = false, length = 64)
