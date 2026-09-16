@@ -21,7 +21,9 @@
 - [x] Caffeine + Redis 两级缓存、精确失效与 Redis 故障放行
 - [x] ChromaDB 语义搜索、异步索引、定时校准与关键词降级
 - [x] 游标分页、复合索引、乐观锁、HikariCP 调优
-- [x] 有界线程池、熔断器、Prometheus 指标、优雅停机、Docker、CI
+- [x] Idempotency-Key 数据库去重，支持客户端安全重试
+- [x] Liveness/Readiness 分级健康检查，Redis 故障显示 DEGRADED
+- [x] 有界线程池、读重试、限流、熔断、Prometheus 指标、优雅停机、Docker、CI
 
 ## 安装说明
 ### 方式一：零配置本地开发
@@ -76,6 +78,8 @@ Key 未配置、超时或服务异常时会降级到确定性规则，并在响�
 | POST | `/api/ai/parse-task` | 解析自然语言 |
 | POST | `/api/ai/decompose` | 拆解复杂任务 |
 | GET | `/actuator/prometheus` | JVM、HTTP、连接池、缓存与熔断指标 |
+| GET | `/livez` | 仅检查进程存活，不探测外部依赖 |
+| GET | `/readyz` | DB 必须可用；Redis 故障为 DEGRADED 但仍接流量 |
 
 列表参数：`status`、`priority`、`tag`、`query`、`page`、`size`（最大 100）、`sort`、`direction`。
 深分页使用 `/api/tasks/cursor?size=50&after={nextCursor}`，避免数据库扫描并丢弃大量 offset 行。
@@ -83,6 +87,7 @@ Key 未配置、超时或服务异常时会降级到确定性规则，并在响�
 ```bash
 curl -X POST http://localhost:8080/api/tasks \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: create-task-20260916-001" \
   -d '{"title":"发布 API","priority":"high","tags":["backend"]}'
 
 curl "http://localhost:8080/api/tasks?status=pending&sort=createdAt&direction=desc"
@@ -93,6 +98,7 @@ curl -X POST http://localhost:8080/api/ai/parse-task \
 ```
 
 冲突（环依赖、前置任务未完成）返回 `409`；资源不存在返回 `404`；验证失败返回带字段详情的 `400`。
+相同 `Idempotency-Key` 与相同请求体只创建一次；同一 Key 配合不同请求返回 `409`。并发竞争由数据库主键约束兜底，失败客户端可用同一 Key 安全重试。
 
 ## 设计决策
 ```mermaid
@@ -113,12 +119,15 @@ flowchart LR
 - Controller 只处理 HTTP 与参数；Service 集中业务规则；Repository 只负责持久化；DTO 隔离 API 与实体。
 - `task_dependencies(task_id, depends_on_id)` 使用复合主键和双外键；服务层 DFS 防止环，数据库约束防止自依赖。
 - schema 由 Flyway 管理；常用筛选与 `(created_at, id)` 游标有复合索引，`version` 防止并发覆盖。
-- 按 ID 查询采用 Cache-Aside：Caffeine L1 为 60 秒、Redis L2 为 5 分钟；事务提交后精确失效。Redis 异常时直接回源，不影响正确性。
-- AI 和向量索引分别使用有界线程池；AI 队列满返回 429，索引池使用调用方背压。Resilience4j 熔断慢外部依赖。
+- 按 ID 查询采用 Cache-Aside：Caffeine 原子加载合并同 Key 并发 miss，Redis TTL 为 5 分钟加 0–60 秒随机抖动；事务提交后精确失效，Redis 异常直接回源。
+- AI 和向量索引分别使用有界线程池；AI 队列满返回 429，索引池使用调用方背压。Resilience4j 对 AI 限流并熔断慢外部依赖。
+- 只有 `GET` 查询标记了瞬时数据访问异常重试（2 次、50ms 间隔）；写操作绝不自动重试，改由 `Idempotency-Key` 保证客户端显式重试安全。
+- `/livez` 不检查外部依赖；`/readyz` 要求 DB 可用。Redis fail-open 时自定义 HealthIndicator 返回 `DEGRADED` 和 HTTP 200。
+- HTTP、事务内请求和两个线程池均参与优雅停机，统一最多等待 30 秒。
 - AI 只产生建议，不直接写库，避免模型输出造成不可逆副作用。
 
 ## 扩展到 10 万+ 任务
-- HikariCP 默认最多 16 个连接，保护普通机器上的数据库；HTTP 等待并发不应无限放大为数据库并发。
+- HikariCP 默认最多 16 个连接、获取连接超时 3 秒、泄漏检测 10 秒；PostgreSQL 查询上限 5 秒，空闲事务上限 10 秒。
 - 普通列表保留 offset 方便 UI；深页使用 keyset 查询，时间复杂度不随页码线性恶化。
 - 两级缓存吸收热点主键读取；Caffeine 有 1 万条容量上限，Redis 有 TTL 和 256 MB LRU 上限，内存使用可控。
 - Chroma 是可重建的派生索引：写事务提交后异步更新，并定时校准最近 200 条任务；失败时搜索降级到 SQL `LIKE`。
@@ -144,12 +153,13 @@ cd frontend && npm run lint && npm run build
 REQUESTS=1000 CONCURRENCY=25 node scripts/load-test.mjs
 ```
 
-后端 6 组集成测试覆盖 CRUD、筛选、验证、offset/游标分页、缓存失效、乐观锁、依赖约束、语义搜索降级和异步 AI。
+后端 10 项测试覆盖 CRUD、幂等创建、健康探针、Redis 降级、筛选、offset/游标分页、缓存失效与并发 miss 合并、乐观锁、依赖约束、语义搜索降级和异步 AI。
 
 ## 已知限制
 - 无用户认证/多租户；规则降级只覆盖常见中英文时间表达。
 - 依赖树按请求递归读取，超大图应改为递归 CTE 并限制深度。
 - 多实例启用 Caffeine 时可能在 TTL 内短暂读到旧值；严格一致部署应关闭 L1，或增加 Redis Pub/Sub 失效广播。
+- 暂未启用读写分离：10 万任务和少量实例下主从复制复杂度高于收益；代码已区分只读事务，达到主库读负载瓶颈后可接入 `AbstractRoutingDataSource`。
 - PostgreSQL 容器使用演示凭据，生产环境必须通过密钥管理注入。
 
 ## 未来改进

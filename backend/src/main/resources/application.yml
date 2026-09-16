@@ -8,8 +8,9 @@ spring:
     hikari:
       maximum-pool-size: ${DB_POOL_MAX:16}
       minimum-idle: ${DB_POOL_MIN:2}
-      connection-timeout: 2000
+      connection-timeout: 3000
       validation-timeout: 1000
+      leak-detection-threshold: 10000
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -32,7 +33,24 @@ spring:
 management:
   health:
     redis:
-      enabled: ${CACHE_REDIS_ENABLED:false}
+      enabled: false
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+          additional-path: server:/livez
+        readiness:
+          include: readinessState,db,redisDependency
+          additional-path: server:/readyz
+      status:
+        order: DOWN,OUT_OF_SERVICE,UNKNOWN,DEGRADED,UP
+        http-mapping:
+          down: 503
+          out-of-service: 503
+          degraded: 200
   endpoints:
     web:
       exposure:
@@ -74,7 +92,7 @@ server:
   error:
     include-message: never
 
-spring.lifecycle.timeout-per-shutdown-phase: 20s
+spring.lifecycle.timeout-per-shutdown-phase: 30s
 
 resilience4j:
   circuitbreaker:
@@ -89,3 +107,18 @@ resilience4j:
         minimum-number-of-calls: 5
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
+  ratelimiter:
+    instances:
+      aiApi:
+        limit-for-period: 20
+        limit-refresh-period: 1s
+        timeout-duration: 0
+  retry:
+    instances:
+      taskRead:
+        max-attempts: 2
+        wait-duration: 50ms
+        retry-exceptions:
+          - org.springframework.dao.TransientDataAccessException
+        ignore-exceptions:
+          - com.example.taskmanager.exception.ApiException

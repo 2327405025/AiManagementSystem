@@ -60,19 +60,18 @@ public class ChromaTaskIndex {
         }
     }
 
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "chroma")
     public List<Long> search(String query, int limit) {
         if (!enabled) {
             throw new IllegalStateException("Vector search is disabled");
         }
-        return circuitBreaker.executeSupplier(() -> {
-            JsonNode response = post("/collections/" + collectionId() + "/query", Map.of(
-                    "query_texts", List.of(query),
-                    "n_results", limit,
-                    "include", List.of("distances", "metadatas")));
-            List<Long> ids = new ArrayList<>();
-            response.path("ids").path(0).forEach(node -> ids.add(Long.parseLong(node.asText())));
-            return ids;
-        });
+        JsonNode response = post("/collections/" + collectionId() + "/query", Map.of(
+                "query_texts", List.of(query),
+                "n_results", limit,
+                "include", List.of("distances", "metadatas")));
+        List<Long> ids = new ArrayList<>();
+        response.path("ids").path(0).forEach(node -> ids.add(Long.parseLong(node.asText())));
+        return ids;
     }
 
     private void upsert(TaskIndexEvent event) {

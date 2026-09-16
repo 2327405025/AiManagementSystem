@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 @Component
 public class TaskCache {
@@ -41,11 +43,15 @@ public class TaskCache {
         CaffeineCacheMetrics.monitor(registry, local, "task.cache.l1");
     }
 
-    public Optional<TaskResponse> get(Long id) {
-        TaskResponse localValue = local.getIfPresent(id);
-        if (localValue != null) {
-            return Optional.of(localValue);
-        }
+    public TaskResponse getOrLoad(Long id, Supplier<TaskResponse> loader) {
+        return local.get(id, key -> loadFromRedis(key).orElseGet(() -> {
+            TaskResponse loaded = loader.get();
+            writeToRedis(loaded);
+            return loaded;
+        }));
+    }
+
+    private Optional<TaskResponse> loadFromRedis(Long id) {
         if (!redisEnabled) {
             return Optional.empty();
         }
@@ -54,22 +60,20 @@ public class TaskCache {
             if (value == null) {
                 return Optional.empty();
             }
-            TaskResponse response = mapper.readValue(value, TaskResponse.class);
-            local.put(id, response);
-            return Optional.of(response);
+            return Optional.of(mapper.readValue(value, TaskResponse.class));
         } catch (Exception ignored) {
             // Cache is an optimization: Redis failure must not fail the request.
             return Optional.empty();
         }
     }
 
-    public void put(TaskResponse task) {
-        local.put(task.id(), task);
+    private void writeToRedis(TaskResponse task) {
         if (!redisEnabled) {
             return;
         }
         try {
-            redis.opsForValue().set(key(task.id()), mapper.writeValueAsString(task), redisTtl);
+            Duration jitteredTtl = redisTtl.plusSeconds(ThreadLocalRandom.current().nextLong(61));
+            redis.opsForValue().set(key(task.id()), mapper.writeValueAsString(task), jitteredTtl);
         } catch (Exception ignored) {
             // PostgreSQL remains the source of truth.
         }

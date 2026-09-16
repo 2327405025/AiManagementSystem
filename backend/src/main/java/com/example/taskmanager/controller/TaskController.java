@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -38,8 +39,10 @@ public class TaskController {
     }
 
     @PostMapping
-    ResponseEntity<TaskResponse> create(@Valid @RequestBody TaskRequest request) {
-        TaskResponse created = service.create(request);
+    ResponseEntity<TaskResponse> create(
+            @Valid @RequestBody TaskRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        TaskResponse created = service.create(request, idempotencyKey);
         return ResponseEntity.created(URI.create("/api/tasks/" + created.id())).body(created);
     }
 

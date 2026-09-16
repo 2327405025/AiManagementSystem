@@ -46,7 +46,7 @@ public class AsyncConfig {
         executor.setQueueCapacity(queueCapacity);
         executor.setKeepAliveSeconds(30);
         executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(15);
+        executor.setAwaitTerminationSeconds(30);
         executor.setRejectedExecutionHandler(rejectionHandler);
         executor.initialize();
         return executor;

@@ -82,6 +82,8 @@ class TaskApiIntegrationTest {
         mvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+        mvc.perform(get("/livez")).andExpect(status().isOk());
+        mvc.perform(get("/readyz")).andExpect(status().isOk());
 
         mvc.perform(post("/api/tasks").contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"\"}"))
                 .andExpect(status().isBadRequest())
@@ -94,6 +96,33 @@ class TaskApiIntegrationTest {
 
         mvc.perform(get("/api/tasks").param("size", "101"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void makesCreateRetriesIdempotent() throws Exception {
+        String body = "{\"title\":\"Retry safe\",\"priority\":\"high\"}";
+        String first = mvc.perform(post("/api/tasks")
+                        .header("Idempotency-Key", "request-123")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String second = mvc.perform(post("/api/tasks")
+                        .header("Idempotency-Key", "request-123")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(mapper.readTree(second).get("id").asLong())
+                .isEqualTo(mapper.readTree(first).get("id").asLong());
+        assertThat(repository.count()).isEqualTo(1);
+
+        mvc.perform(post("/api/tasks")
+                        .header("Idempotency-Key", "request-123")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Different request\"}"))
+                .andExpect(status().isConflict());
     }
 
     @Test

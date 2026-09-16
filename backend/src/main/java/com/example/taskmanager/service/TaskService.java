@@ -2,6 +2,7 @@ package com.example.taskmanager.service;
 
 import com.example.taskmanager.cache.TaskCache;
 import com.example.taskmanager.domain.Priority;
+import com.example.taskmanager.domain.IdempotencyRecord;
 import com.example.taskmanager.domain.Task;
 import com.example.taskmanager.domain.TaskStatus;
 import com.example.taskmanager.dto.TaskDtos.CursorPage;
@@ -11,13 +12,17 @@ import com.example.taskmanager.dto.TaskDtos.TaskResponse;
 import com.example.taskmanager.exception.ApiException;
 import com.example.taskmanager.repository.TaskRepository;
 import com.example.taskmanager.repository.TaskSpecifications;
+import com.example.taskmanager.repository.IdempotencyRecordRepository;
 import com.example.taskmanager.vector.TaskIndexEvent;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Comparator;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,41 +41,61 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class TaskService {
     private final TaskRepository repository;
+    private final IdempotencyRecordRepository idempotencyRecords;
     private final TaskCache cache;
     private final ApplicationEventPublisher events;
 
-    public TaskService(TaskRepository repository, TaskCache cache, ApplicationEventPublisher events) {
+    public TaskService(
+            TaskRepository repository,
+            IdempotencyRecordRepository idempotencyRecords,
+            TaskCache cache,
+            ApplicationEventPublisher events) {
         this.repository = repository;
+        this.idempotencyRecords = idempotencyRecords;
         this.cache = cache;
         this.events = events;
     }
 
     @Transactional
-    public TaskResponse create(TaskRequest request) {
+    public TaskResponse create(TaskRequest request, String idempotencyKey) {
+        String key = normalizeIdempotencyKey(idempotencyKey);
+        String requestHash = key == null ? null : hash(request);
+        if (key != null) {
+            var existing = idempotencyRecords.findById(key);
+            if (existing.isPresent()) {
+                if (!existing.get().getRequestHash().equals(requestHash)) {
+                    throw ApiException.conflict("Idempotency-Key was already used with a different request");
+                }
+                return toResponse(require(existing.get().getTaskId()));
+            }
+        }
         Task task = new Task();
         apply(task, request, true);
         TaskResponse response = toResponse(repository.saveAndFlush(task));
+        if (key != null) {
+            idempotencyRecords.saveAndFlush(new IdempotencyRecord(key, requestHash, task.getId()));
+        }
         publishAfterCommit(indexEvent(task));
         return response;
     }
 
+    @Retry(name = "taskRead")
     public TaskResponse get(Long id) {
-        return cache.get(id).orElseGet(() -> {
-            TaskResponse response = toResponse(require(id));
-            cache.put(response);
-            return response;
-        });
+        return cache.getOrLoad(id, () -> toResponse(require(id)));
     }
 
+    @Retry(name = "taskRead")
     public List<TaskResponse> getMany(List<Long> ids) {
         return ids.stream().map(this::get).toList();
     }
 
+    @Retry(name = "taskRead")
     public Page<TaskResponse> list(TaskStatus status, Priority priority, String tag, String query, Pageable pageable) {
         return repository.findAll(TaskSpecifications.filtered(status, priority, tag, query), pageable)
                 .map(this::toResponse);
     }
 
+    @Retry(name = "taskRead")
     public CursorPage listByCursor(String cursor, int size) {
         Cursor value = decodeCursor(cursor);
         var slice = repository.findNextSlice(value.createdAt(), value.id(), PageRequest.of(0, size));
@@ -126,6 +152,7 @@ public class TaskService {
         evictAfterCommit(taskId);
     }
 
+    @Retry(name = "taskRead")
     public DependencyNode dependencyTree(Long id) {
         return toNode(require(id), new HashSet<>());
     }
@@ -231,6 +258,38 @@ public class TaskService {
     }
 
     private record Cursor(Instant createdAt, Long id) {}
+
+    private String normalizeIdempotencyKey(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String normalized = key.trim();
+        if (normalized.length() > 100) {
+            throw new IllegalArgumentException("Idempotency-Key must not exceed 100 characters");
+        }
+        return normalized;
+    }
+
+    private String hash(TaskRequest request) {
+        String sortedTags = request.tags() == null ? "" : request.tags().stream()
+                .map(String::trim)
+                .sorted(Comparator.naturalOrder())
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
+        String canonical = String.join("\n",
+                request.title().trim(),
+                String.valueOf(request.description()),
+                String.valueOf(request.status()),
+                String.valueOf(request.priority()),
+                String.valueOf(request.dueAt()),
+                sortedTags);
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
 
     private void evictAfterCommit(Long id) {
         afterCommit(() -> cache.evict(id));
